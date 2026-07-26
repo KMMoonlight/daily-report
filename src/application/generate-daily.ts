@@ -1,10 +1,15 @@
-import { createHash } from "node:crypto";
 import { access, mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { stringify } from "yaml";
-import { reportSchema, type Report, type ReportItem } from "../domain/report";
+import { reportSchema, type Report } from "../domain/report";
 import type { LanguageModel } from "../infrastructure/llm";
 import type { CollectedItem, SourceAdapter } from "../infrastructure/sources";
+import {
+  clusterItems,
+  mergeDuplicateReportItems,
+  normalizeCollectedItem,
+  normalizeTitle,
+} from "./cluster-items";
 
 interface GenerateDailyOptions {
   date: string;
@@ -47,63 +52,6 @@ export function shanghaiDayWindow(date: string) {
   if (Number.isNaN(start.valueOf())) throw new Error(`Invalid report date: ${date}`);
   const end = new Date(start.valueOf() + dayInMilliseconds - 1);
   return { start, end };
-}
-
-function normalizeTitle(title: string) {
-  return title
-    .normalize("NFKC")
-    .toLocaleLowerCase()
-    .replace(/[^\p{Letter}\p{Number}]+/gu, " ")
-    .trim();
-}
-
-function canonicalUrl(value: string) {
-  const url = new URL(value);
-  for (const key of [...url.searchParams.keys()]) {
-    if (key.startsWith("utm_") || key === "ref" || key === "source") url.searchParams.delete(key);
-  }
-  url.hash = "";
-  return url.toString();
-}
-
-function titleTokens(title: string) {
-  return new Set(normalizeTitle(title).split(" ").filter(Boolean));
-}
-
-function titleSimilarity(left: string, right: string) {
-  const leftTokens = titleTokens(left);
-  const rightTokens = titleTokens(right);
-  const intersection = [...leftTokens].filter((token) => rightTokens.has(token)).length;
-  const union = new Set([...leftTokens, ...rightTokens]).size;
-  return union ? intersection / union : 0;
-}
-
-function normalizeCollectedItem(item: CollectedItem): CollectedItem {
-  const normalizedUrl = canonicalUrl(item.url);
-  const contentFingerprint = createHash("sha256")
-    .update(`${normalizeTitle(item.title)}\n${item.excerpt.trim().toLocaleLowerCase()}`)
-    .digest("hex");
-  return { ...item, normalizedUrl, contentFingerprint };
-}
-
-function clusterItems(items: CollectedItem[]) {
-  const clusters: CollectedItem[][] = [];
-  for (const item of items) {
-    const existing = clusters.find((cluster) =>
-      cluster.some(
-        (candidate) =>
-          candidate.normalizedUrl === item.normalizedUrl ||
-          candidate.contentFingerprint === item.contentFingerprint ||
-          titleSimilarity(candidate.title, item.title) >= 0.7,
-      ),
-    );
-    if (existing) existing.push(item);
-    else clusters.push([item]);
-  }
-  return clusters.map((cluster) => ({
-    key: normalizeTitle(cluster[0]?.title ?? "") || cluster[0]?.contentFingerprint || "",
-    items: cluster,
-  }));
 }
 
 function slugify(value: string) {
@@ -287,7 +235,8 @@ export async function generateDaily(options: GenerateDailyOptions): Promise<Dail
   await writeFile(candidatesPath, JSON.stringify(uniqueCandidates, null, 2));
   await writeFile(storiesPath, JSON.stringify(stories, null, 2));
 
-  if (published.length === 0) {
+  const deduplicated = mergeDuplicateReportItems(published);
+  if (deduplicated.length === 0) {
     return {
       date: options.date,
       publishedItems: 0,
@@ -304,13 +253,13 @@ export async function generateDaily(options: GenerateDailyOptions): Promise<Dail
     date: options.date,
     coverageStart: window.start.toISOString(),
     coverageEnd: window.end.toISOString(),
-    items: published,
+    items: deduplicated,
   });
   await writeFile(outputPath, renderMarkdown(report), { flag: "wx" });
 
   return {
     date: options.date,
-    publishedItems: published.length,
+    publishedItems: deduplicated.length,
     candidateItems: uniqueCandidates.length,
     failedItems,
     sourceErrors,
