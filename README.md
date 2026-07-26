@@ -37,12 +37,15 @@ docker compose up -d --build --force-recreate
 支持的配置：
 
 - `LLM_PROVIDER`：`openai-compatible`、`anthropic` 或 `gemini`
-- `LLM_API_KEY`：模型密钥
+- `LLM_API_KEY`：模型密钥（**自动生成日报必需**）
 - `LLM_BASE_URL`：兼容接口地址
-- `LLM_TRIAGE_MODEL`：低成本初筛模型
-- `LLM_SYNTHESIS_MODEL`：高质量日报与周报模型
+- `LLM_TRIAGE_MODEL`：低成本初筛模型（**必需**）
+- `LLM_SYNTHESIS_MODEL`：高质量日报与周报模型（**必需**）
 - `APP_PORT`：本机访问端口，默认 `8080`
+- `SCHEDULER_MIN_HOUR`：北京时间最早开始调度的小时，默认 `9`
 - `GITHUB_TOKEN`：匿名限额成为瓶颈后再配置
+
+未配置三个 LLM 变量时，网站可打开，但**不会自动拉取/生成日报**。容器每 15 分钟检查一次；可打开 `/api/scheduler-status` 查看当前跳过原因与最近一次调度结果。
 
 编辑 `config/sources.json` 管理默认来源。来源只会从配置加载，不会因自动发现而永久加入。
 

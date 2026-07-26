@@ -21,6 +21,15 @@ docker compose down
 
 Zeabur 直接使用仓库 `Dockerfile`，监听 8080 端口；在服务设置中配置模型环境变量和上述三个持久卷。
 
+自动拉取依赖运行时环境变量（不是构建参数）：
+
+- `LLM_API_KEY`
+- `LLM_TRIAGE_MODEL`
+- `LLM_SYNTHESIS_MODEL`
+- 可选：`LLM_PROVIDER`、`LLM_BASE_URL`、`SCHEDULER_MIN_HOUR`
+
+容器启动后每 15 分钟检查一次；北京时间达到 `SCHEDULER_MIN_HOUR`（默认 9 点）后才会生成**前一自然日**日报。打开 `/api/scheduler-status` 可查看是否因缺密钥或未到点而暂停。
+
 ## 宿主机 Git 发布（备选）
 
 1. 确认 `.env` 中模型密钥、初筛模型和综合模型均已配置。
