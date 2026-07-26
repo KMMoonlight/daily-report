@@ -1,0 +1,64 @@
+---
+import type { ReportItem } from "../domain/report";
+
+interface Props {
+  item: ReportItem;
+  compact?: boolean;
+  corrections?: Array<{ href: string; title: string }>;
+  previousHref?: string | undefined;
+}
+
+const { item, compact = false, corrections = [], previousHref } = Astro.props;
+
+const sectionNames = {
+  products: "产品与工具",
+  research: "研究与开源成果",
+  "deep-reads": "深度内容",
+  events: "行业动态",
+  radar: "雷达快讯",
+  corrections: "更正",
+};
+
+const topicNames = {
+  ai: "AI / 智能体",
+  "developer-tools": "开发者工具",
+  chips: "芯片 / 算力",
+  robotics: "机器人",
+  "consumer-tech": "消费科技",
+  "tech-radar": "科技雷达",
+};
+---
+
+<article class:list={["report-item", { compact }]} data-report-card data-section={item.section} data-topics={item.topics.join(",")} data-search={`${item.title} ${item.summary} ${item.analysis}`}>
+  <div class="item-kicker">
+    <span>{sectionNames[item.section]}</span>
+    {item.status === "unconfirmed" && <strong>未确认</strong>}
+  </div>
+  <h3 id={item.id}>{item.title}</h3>
+  <p class="summary">{item.summary}</p>
+  {!compact && item.analysis && <p class="analysis">{item.analysis}</p>}
+  {!item.fullTextRead && <p class="notice">仅基于公开摘要，未读取全文。</p>}
+  {corrections.length > 0 && (
+    <aside class="correction-notice">
+      <strong>此条目有后续更正</strong>
+      {corrections.map((correction) => <a href={correction.href}>查看更正</a>)}
+    </aside>
+  )}
+  {previousHref && <a class="story-link" href={previousHref}>← 查看此前脉络</a>}
+  <div class="item-meta">
+    <ul class="topic-list" aria-label="主题">
+      {item.topics.map((topic) => <li>{topicNames[topic]}</li>)}
+    </ul>
+    <details class="sources">
+      <summary>来源 {item.sources.length}</summary>
+      <ul>
+        {item.sources.map((source) => (
+          <li>
+            <a href={source.url} rel="noreferrer">{source.title}</a>
+            {source.key && <span>关键来源</span>}
+          </li>
+        ))}
+      </ul>
+    </details>
+  </div>
+</article>

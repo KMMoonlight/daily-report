@@ -1,0 +1,109 @@
+---
+import { getCollection } from "astro:content";
+import ReportItem from "../components/ReportItem.astro";
+import BaseLayout from "../layouts/BaseLayout.astro";
+
+const reports = (await getCollection("daily")).sort((a, b) => b.data.date.localeCompare(a.data.date));
+const weeklyReports = (await getCollection("weekly")).sort((a, b) => b.data.date.localeCompare(a.data.date));
+const entries = reports.flatMap((report) =>
+  report.data.items.map((item) => ({ reportId: report.id, reportDate: report.data.date, item })),
+);
+---
+
+<BaseLayout title="归档 · Tech Daily & Weekly">
+  <section class="archive-shell">
+    <header class="page-heading">
+      <div>
+        <p class="report-date">Archive / Search</p>
+        <h1>全部信号</h1>
+      </div>
+      <span>{reports.length} 期日报</span>
+    </header>
+
+    <section class="weekly-index" aria-labelledby="weekly-heading">
+      <h2 id="weekly-heading">周报</h2>
+      <div>
+        {
+          weeklyReports.map((report) => (
+            <a href={`/weekly/${report.id}`}>
+              <span>{report.data.date}</span>
+              <strong>{report.data.title}</strong>
+            </a>
+          ))
+        }
+      </div>
+    </section>
+
+    <form class="filters" id="search" onsubmit="return false">
+      <label>
+        栏目
+        <select name="section" aria-label="栏目">
+          <option value="">全部栏目</option>
+          <option value="products">产品与工具</option>
+          <option value="research">研究与开源成果</option>
+          <option value="deep-reads">深度内容</option>
+          <option value="events">行业动态</option>
+          <option value="radar">雷达快讯</option>
+          <option value="corrections">更正</option>
+        </select>
+      </label>
+      <label>
+        核心主题
+        <select name="topic" aria-label="核心主题">
+          <option value="">全部主题</option>
+          <option value="ai">AI / 智能体</option>
+          <option value="developer-tools">开发者工具</option>
+          <option value="chips">芯片 / 算力</option>
+          <option value="robotics">机器人</option>
+          <option value="consumer-tech">消费科技</option>
+          <option value="tech-radar">科技雷达</option>
+        </select>
+      </label>
+      <label>
+        搜索
+        <input name="query" type="search" aria-label="搜索" placeholder="标题、摘要或分析…" autocomplete="off" />
+      </label>
+    </form>
+
+    <div class="item-grid" data-archive-list>
+      {entries.map(({ reportId, reportDate, item }) => (
+        <div data-entry>
+          <a class="report-date" href={`/daily/${reportId}#${item.id}`}>{reportDate}</a>
+          <ReportItem item={item} />
+        </div>
+      ))}
+    </div>
+    <p class="empty-state" data-empty>没有符合条件的内容。</p>
+  </section>
+</BaseLayout>
+
+<script>
+  const form = document.querySelector<HTMLFormElement>(".filters");
+  const entries = [...document.querySelectorAll<HTMLElement>("[data-entry]")];
+  const empty = document.querySelector<HTMLElement>("[data-empty]");
+
+  function filterEntries() {
+    if (!form) return;
+    const data = new FormData(form);
+    const section = String(data.get("section") ?? "");
+    const topic = String(data.get("topic") ?? "");
+    const query = String(data.get("query") ?? "").trim().toLocaleLowerCase("zh-CN");
+    let visible = 0;
+
+    for (const entry of entries) {
+      const card = entry.querySelector<HTMLElement>("[data-report-card]");
+      const matches =
+        card &&
+        (!section || card.dataset.section === section) &&
+        (!topic || card.dataset.topics?.split(",").includes(topic)) &&
+        (!query || card.dataset.search?.toLocaleLowerCase("zh-CN").includes(query));
+      entry.hidden = !matches;
+      if (matches) visible += 1;
+    }
+
+    if (empty) empty.style.display = visible ? "none" : "block";
+  }
+
+  form?.addEventListener("input", filterEntries);
+  form?.addEventListener("change", filterEntries);
+</script>

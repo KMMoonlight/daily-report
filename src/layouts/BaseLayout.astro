@@ -1,0 +1,45 @@
+---
+import "../styles/global.css";
+
+interface Props {
+  title?: string;
+  description?: string;
+}
+
+const {
+  title = "Tech Daily & Weekly",
+  description = "为软件开发者准备的证据优先科技简报",
+} = Astro.props;
+---
+
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width" />
+    <meta name="description" content={description} />
+    <meta name="robots" content="noindex,nofollow,noarchive" />
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22><rect width=%2232%22 height=%2232%22 fill=%22%23151b19%22/><path d=%22M7 9h18v3H7zm0 6h12v3H7zm0 6h16v3H7z%22 fill=%22%23e6542f%22/></svg>" />
+    <title>{title}</title>
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="wordmark" href="/" aria-label="Tech Daily & Weekly 首页">
+        <span class="wordmark-mark">TD</span>
+        <span>Tech Daily <i>&</i> Weekly</span>
+      </a>
+      <nav aria-label="主导航">
+        <a href="/">最新</a>
+        <a href="/archive">归档</a>
+        <a href="/archive#search">搜索</a>
+      </nav>
+    </header>
+    <main>
+      <slot />
+    </main>
+    <footer>
+      <p>证据优先，去除噪声。为软件开发者编辑。</p>
+      <span>Asia / Shanghai</span>
+    </footer>
+  </body>
+</html>

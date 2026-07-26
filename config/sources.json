@@ -1,0 +1,74 @@
+[
+  {
+    "id": "openai-news",
+    "type": "rss",
+    "url": "https://openai.com/news/rss.xml",
+    "sourceKind": "primary",
+    "topics": ["ai"]
+  },
+  {
+    "id": "github-changelog",
+    "type": "rss",
+    "url": "https://github.blog/changelog/feed/",
+    "sourceKind": "primary",
+    "topics": ["developer-tools"]
+  },
+  {
+    "id": "cloudflare-blog",
+    "type": "rss",
+    "url": "https://blog.cloudflare.com/rss/",
+    "sourceKind": "primary",
+    "topics": ["developer-tools", "chips"]
+  },
+  {
+    "id": "nvidia-blog",
+    "type": "rss",
+    "url": "https://blogs.nvidia.com/feed/",
+    "sourceKind": "primary",
+    "topics": ["chips", "ai"]
+  },
+  {
+    "id": "ieee-robotics",
+    "type": "rss",
+    "url": "https://spectrum.ieee.org/feeds/topic/robotics.rss",
+    "sourceKind": "media",
+    "topics": ["robotics"]
+  },
+  {
+    "id": "apple-newsroom",
+    "type": "rss",
+    "url": "https://www.apple.com/newsroom/rss-feed.rss",
+    "sourceKind": "primary",
+    "topics": ["consumer-tech"]
+  },
+  {
+    "id": "ollama-releases",
+    "type": "github",
+    "repository": "ollama/ollama",
+    "topics": ["ai", "developer-tools"]
+  },
+  {
+    "id": "nextjs-releases",
+    "type": "github",
+    "repository": "vercel/next.js",
+    "topics": ["developer-tools"]
+  },
+  {
+    "id": "arxiv-ai",
+    "type": "arxiv",
+    "category": "cs.AI",
+    "topics": ["ai"]
+  },
+  {
+    "id": "arxiv-software-engineering",
+    "type": "arxiv",
+    "category": "cs.SE",
+    "topics": ["developer-tools"]
+  },
+  {
+    "id": "hacker-news",
+    "type": "hacker-news",
+    "minimumScore": 100,
+    "topics": ["tech-radar"]
+  }
+]

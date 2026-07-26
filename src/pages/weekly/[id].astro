@@ -1,0 +1,30 @@
+---
+import { getCollection, render } from "astro:content";
+import ReportItem from "../../components/ReportItem.astro";
+import BaseLayout from "../../layouts/BaseLayout.astro";
+
+export async function getStaticPaths() {
+  const reports = await getCollection("weekly");
+  return reports.map((report) => ({ params: { id: report.id }, props: { report } }));
+}
+
+const { report } = Astro.props;
+const { Content } = await render(report);
+---
+
+<BaseLayout title={`${report.data.title} · Tech Daily & Weekly`}>
+  <article class="report-shell">
+    <header class="page-heading">
+      <div>
+        <p class="report-date">{report.data.date} · Weekly</p>
+        <h1>{report.data.title}</h1>
+      </div>
+      <a href="/archive">返回归档</a>
+    </header>
+    {report.data.trendSummary && <p class="report-intro">{report.data.trendSummary}</p>}
+    <div class="report-intro"><Content /></div>
+    <div class="item-grid">
+      {report.data.items.map((item) => <ReportItem item={item} />)}
+    </div>
+  </article>
+</BaseLayout>
