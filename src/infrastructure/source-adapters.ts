@@ -18,14 +18,10 @@ export interface RssSourceConfig extends CommonConfig {
   sourceKind: SourceKind;
 }
 
-export interface GitHubSourceConfig extends CommonConfig {
-  type: "github";
-  repository: string;
-}
-
-export interface ArxivSourceConfig extends CommonConfig {
-  type: "arxiv";
-  category: string;
+export interface GitHubTrendingSourceConfig extends CommonConfig {
+  type: "github-trending";
+  since?: "daily" | "weekly" | "monthly";
+  spokenLanguageCode?: string;
 }
 
 export interface HackerNewsSourceConfig extends CommonConfig {
@@ -33,7 +29,7 @@ export interface HackerNewsSourceConfig extends CommonConfig {
   minimumScore: number;
 }
 
-export type SourceConfig = RssSourceConfig | GitHubSourceConfig | ArxivSourceConfig | HackerNewsSourceConfig;
+export type SourceConfig = RssSourceConfig | GitHubTrendingSourceConfig | HackerNewsSourceConfig;
 
 const xmlParser = new XMLParser({
   ignoreAttributes: false,
@@ -131,72 +127,67 @@ export class RssAdapter implements SourceAdapter {
   }
 }
 
-export class GitHubReleasesAdapter implements SourceAdapter {
+export class GitHubTrendingAdapter implements SourceAdapter {
   readonly id: string;
 
   constructor(
-    private readonly config: GitHubSourceConfig,
+    private readonly config: GitHubTrendingSourceConfig,
     private readonly fetcher: FetchLike = fetch,
   ) {
     this.id = config.id;
   }
 
   async collect(window: CollectionWindow): Promise<CollectedItem[]> {
-    const headers: Record<string, string> = { Accept: "application/vnd.github+json" };
-    if (process.env.GITHUB_TOKEN) headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
+    const since = this.config.since ?? "daily";
+    const params = new URLSearchParams({ since });
+    if (this.config.spokenLanguageCode) params.set("spoken_language_code", this.config.spokenLanguageCode);
     const response = responseGuard(
-      await this.fetcher(`https://api.github.com/repos/${this.config.repository}/releases?per_page=20`, { headers }),
+      await this.fetcher(`https://github.com/trending?${params.toString()}`, {
+        headers: {
+          Accept: "text/html",
+          "User-Agent": "TechDailyWeekly/1.0 (+https://github.com/trending)",
+        },
+      }),
       this.id,
     );
-    const releases = (await response.json()) as Array<Record<string, any>>;
-    return releases
-      .filter((release) => release.published_at && inWindow(release.published_at, window))
-      .map((release) => ({
-        externalId: String(release.id),
-        sourceId: this.id,
-        title: `${this.config.repository} ${release.name || release.tag_name}`,
-        url: String(release.html_url),
-        publishedAt: new Date(release.published_at).toISOString(),
-        discoveredAt: new Date().toISOString(),
-        excerpt: plainText(release.body),
-        sourceKind: "primary",
-        suggestedTopics: this.config.topics,
-        fullTextRead: true,
-      }));
-  }
-}
+    const html = await response.text();
+    const rows = html.split(/<article class="Box-row"/).slice(1);
+    const publishedAt = window.end.toISOString();
+    const seen = new Set<string>();
 
-export class ArxivAdapter implements SourceAdapter {
-  readonly id: string;
+    return rows
+      .map((row): CollectedItem | undefined => {
+        const heading = row.match(/<h2[\s\S]*?<\/h2>/)?.[0] ?? "";
+        const path = heading.match(/href="(\/[^"/]+\/[^"/]+)"/)?.[1];
+        if (!path) return undefined;
+        const fullName = path.replace(/^\//, "");
+        if (seen.has(fullName)) return undefined;
+        seen.add(fullName);
 
-  constructor(
-    private readonly config: ArxivSourceConfig,
-    private readonly fetcher: FetchLike = fetch,
-  ) {
-    this.id = config.id;
-  }
+        const description =
+          plainText(row.match(/<p class="col-9[^"]*"[^>]*>([\s\S]*?)<\/p>/)?.[1] ?? "") ||
+          plainText(row.match(/<p[\s\S]*?class="[^"]*color-fg-muted[^"]*"[^>]*>([\s\S]*?)<\/p>/)?.[1] ?? "");
+        const language = plainText(row.match(/itemprop="programmingLanguage">([^<]+)/)?.[1] ?? "");
+        const starsToday = plainText(
+          row.match(/([\d,]+)\s+stars (?:today|this week|this month)/i)?.[1] ?? "",
+        ).replace(/,/g, "");
+        const excerptParts = [
+          description,
+          language ? `Language: ${language}` : "",
+          starsToday ? `Stars gained: ${starsToday}` : "",
+        ].filter(Boolean);
 
-  async collect(window: CollectionWindow): Promise<CollectedItem[]> {
-    const url = `https://export.arxiv.org/api/query?search_query=cat:${encodeURIComponent(this.config.category)}&sortBy=submittedDate&sortOrder=descending&max_results=100`;
-    const response = responseGuard(await this.fetcher(url), this.id);
-    const document = xmlParser.parse(await response.text()) as Record<string, any>;
-    return asArray<Record<string, any>>(document.feed?.entry)
-      .map((entry): CollectedItem | undefined => {
-        const publishedAt = String(entry.published ?? entry.updated ?? "");
-        const links = asArray<Record<string, string>>(entry.link);
-        const link = links.find((candidate) => candidate["@_rel"] === "alternate")?.["@_href"] ?? String(entry.id ?? "");
-        if (!publishedAt || !link || !inWindow(publishedAt, window)) return undefined;
         return {
-          externalId: String(entry.id ?? link).split("/").pop() ?? link,
+          externalId: fullName,
           sourceId: this.id,
-          title: plainText(entry.title),
-          url: link,
-          publishedAt: new Date(publishedAt).toISOString(),
+          title: description ? `${fullName}: ${description}` : fullName,
+          url: `https://github.com/${fullName}`,
+          publishedAt,
           discoveredAt: new Date().toISOString(),
-          excerpt: plainText(entry.summary),
-          sourceKind: "primary",
+          excerpt: excerptParts.join(" · "),
+          sourceKind: "community",
           suggestedTopics: this.config.topics,
-          fullTextRead: true,
+          fullTextRead: false,
         };
       })
       .filter((item): item is CollectedItem => item !== undefined);
@@ -250,10 +241,8 @@ export function createSourceAdapter(config: SourceConfig): SourceAdapter {
   switch (config.type) {
     case "rss":
       return new RssAdapter(config);
-    case "github":
-      return new GitHubReleasesAdapter(config);
-    case "arxiv":
-      return new ArxivAdapter(config);
+    case "github-trending":
+      return new GitHubTrendingAdapter(config);
     case "hacker-news":
       return new HackerNewsAdapter(config);
   }

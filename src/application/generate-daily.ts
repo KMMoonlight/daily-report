@@ -240,7 +240,13 @@ export async function generateDaily(options: GenerateDailyOptions): Promise<Dail
       const effectiveTriage = triage;
       const synthesis = await retryModel(() => options.model.synthesize(cluster, effectiveTriage));
       const id = slugify(`${primary.externalId}-${synthesis.title}`);
-      const existingStory = stories[clusterKey];
+      const existingStoryKey =
+        primary.sourceId === "github-trending" ? `github-trending:${primary.externalId}` : clusterKey;
+      const existingStory = stories[existingStoryKey];
+      if (primary.sourceId === "github-trending" && existingStory) {
+        // Trending repos linger for days; only keep the first appearance.
+        continue;
+      }
       const storyId = existingStory?.storyId ?? `story-${slugify(primary.title)}`;
       const item = reportSchema.shape.items.element.parse({
         id,
@@ -266,7 +272,7 @@ export async function generateDaily(options: GenerateDailyOptions): Promise<Dail
         })),
       });
       published.push(item);
-      stories[clusterKey] = { storyId, lastItemId: id, lastDate: options.date };
+      stories[existingStoryKey] = { storyId, lastItemId: id, lastDate: options.date };
     } catch {
       failedItems += 1;
     }

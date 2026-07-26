@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ArxivAdapter, GitHubReleasesAdapter, HackerNewsAdapter, RssAdapter } from "../src/infrastructure/source-adapters";
+import { GitHubTrendingAdapter, HackerNewsAdapter, RssAdapter } from "../src/infrastructure/source-adapters";
 
 const window = {
   start: new Date("2026-07-24T16:00:00.000Z"),
@@ -32,35 +32,41 @@ describe("source adapters", () => {
     });
   });
 
-  it("normalizes a GitHub release", async () => {
-    const adapter = new GitHubReleasesAdapter(
-      { id: "repo", type: "github", repository: "owner/repo", topics: ["developer-tools"] },
-      async () =>
-        new Response(
-          JSON.stringify([
-            {
-              id: 42,
-              name: "v2.0",
-              html_url: "https://github.com/owner/repo/releases/tag/v2",
-              published_at: "2026-07-25T04:00:00.000Z",
-              body: "Faster builds",
-            },
-          ]),
-        ),
+  it("normalizes GitHub Trending repositories and deduplicates by repo", async () => {
+    const html = `
+      <article class="Box-row">
+        <h2 class="h3 lh-condensed"><a href="/owner/demo">owner / demo</a></h2>
+        <p class="col-9 color-fg-muted my-1 pr-4">A useful tool</p>
+        <span itemprop="programmingLanguage">TypeScript</span>
+        <span>120 stars today</span>
+      </article>
+      <article class="Box-row">
+        <h2 class="h3 lh-condensed"><a href="/owner/demo">owner / demo</a></h2>
+        <p class="col-9 color-fg-muted my-1 pr-4">Duplicate row</p>
+      </article>
+      <article class="Box-row">
+        <h2 class="h3 lh-condensed"><a href="/other/app">other / app</a></h2>
+        <p class="col-9 color-fg-muted my-1 pr-4">Another repo</p>
+        <span>80 stars today</span>
+      </article>
+    `;
+    const adapter = new GitHubTrendingAdapter(
+      { id: "github-trending", type: "github-trending", since: "daily", topics: ["developer-tools"] },
+      async () => new Response(html),
     );
 
     const items = await adapter.collect(window);
-    expect(items[0]).toMatchObject({ externalId: "42", sourceKind: "primary", title: "owner/repo v2.0" });
+    expect(items).toHaveLength(2);
+    expect(items[0]).toMatchObject({
+      externalId: "owner/demo",
+      url: "https://github.com/owner/demo",
+      sourceKind: "community",
+      title: "owner/demo: A useful tool",
+    });
+    expect(items[1]?.externalId).toBe("other/app");
   });
 
-  it("normalizes arXiv and Hacker News entries", async () => {
-    const arxiv = new ArxivAdapter(
-      { id: "arxiv-ai", type: "arxiv", category: "cs.AI", topics: ["ai"] },
-      async () =>
-        new Response(
-          `<?xml version="1.0"?><feed xmlns="http://www.w3.org/2005/Atom"><entry><id>http://arxiv.org/abs/2607.12345</id><title>Agent Evaluation</title><updated>2026-07-25T04:00:00Z</updated><summary>A benchmark.</summary><link href="http://arxiv.org/abs/2607.12345"/></entry></feed>`,
-        ),
-    );
+  it("normalizes Hacker News entries", async () => {
     const hackerNews = new HackerNewsAdapter(
       { id: "hn", type: "hacker-news", topics: ["tech-radar"], minimumScore: 50 },
       async (input) => {
@@ -78,7 +84,6 @@ describe("source adapters", () => {
       },
     );
 
-    expect((await arxiv.collect(window))[0]?.sourceKind).toBe("primary");
     expect((await hackerNews.collect(window))[0]?.sourceKind).toBe("community");
   });
 });

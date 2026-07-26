@@ -40,16 +40,6 @@
     "topics": ["chips", "ai"]
   },
   {
-    "id": "ieee-robotics",
-    "name": "IEEE Spectrum Robotics",
-    "language": "en",
-    "enabled": true,
-    "type": "rss",
-    "url": "https://spectrum.ieee.org/feeds/topic/robotics.rss",
-    "sourceKind": "media",
-    "topics": ["robotics"]
-  },
-  {
     "id": "apple-newsroom",
     "name": "Apple Newsroom",
     "language": "en",
@@ -60,40 +50,123 @@
     "topics": ["consumer-tech"]
   },
   {
-    "id": "ollama-releases",
-    "name": "Ollama Releases",
+    "id": "solidot",
+    "name": "Solidot",
+    "language": "zh",
+    "enabled": true,
+    "type": "rss",
+    "url": "https://www.solidot.org/index.rss",
+    "sourceKind": "media",
+    "topics": ["tech-radar", "consumer-tech"]
+  },
+  {
+    "id": "sspai",
+    "name": "少数派",
+    "language": "zh",
+    "enabled": true,
+    "type": "rss",
+    "url": "https://sspai.com/feed",
+    "sourceKind": "media",
+    "topics": ["consumer-tech", "developer-tools"]
+  },
+  {
+    "id": "infoq-cn",
+    "name": "InfoQ 中文",
+    "language": "zh",
+    "enabled": true,
+    "type": "rss",
+    "url": "https://www.infoq.cn/feed",
+    "sourceKind": "media",
+    "topics": ["developer-tools", "ai"]
+  },
+  {
+    "id": "ifanr",
+    "name": "爱范儿",
+    "language": "zh",
+    "enabled": true,
+    "type": "rss",
+    "url": "https://www.ifanr.com/feed",
+    "sourceKind": "media",
+    "topics": ["consumer-tech", "ai"]
+  },
+  {
+    "id": "appinn",
+    "name": "小众软件",
+    "language": "zh",
+    "enabled": true,
+    "type": "rss",
+    "url": "https://feeds.appinn.com/appinns/",
+    "sourceKind": "media",
+    "topics": ["developer-tools", "consumer-tech"]
+  },
+  {
+    "id": "36kr",
+    "name": "36氪",
+    "language": "zh",
+    "enabled": true,
+    "type": "rss",
+    "url": "https://36kr.com/feed",
+    "sourceKind": "media",
+    "topics": ["tech-radar", "consumer-tech"]
+  },
+  {
+    "id": "meituan-tech",
+    "name": "美团技术团队",
+    "language": "zh",
+    "enabled": true,
+    "type": "rss",
+    "url": "https://tech.meituan.com/feed/",
+    "sourceKind": "expert",
+    "topics": ["developer-tools", "ai"]
+  },
+  {
+    "id": "ruanyifeng",
+    "name": "阮一峰的网络日志",
+    "language": "zh",
+    "enabled": true,
+    "type": "rss",
+    "url": "https://www.ruanyifeng.com/blog/atom.xml",
+    "sourceKind": "expert",
+    "topics": ["developer-tools", "tech-radar"]
+  },
+  {
+    "id": "coolshell",
+    "name": "酷壳 CoolShell",
+    "language": "zh",
+    "enabled": true,
+    "type": "rss",
+    "url": "https://coolshell.cn/feed",
+    "sourceKind": "expert",
+    "topics": ["developer-tools"]
+  },
+  {
+    "id": "simon-willison",
+    "name": "Simon Willison",
     "language": "en",
     "enabled": true,
-    "type": "github",
-    "repository": "ollama/ollama",
+    "type": "rss",
+    "url": "https://simonwillison.net/atom/everything/",
+    "sourceKind": "expert",
     "topics": ["ai", "developer-tools"]
   },
   {
-    "id": "nextjs-releases",
-    "name": "Next.js Releases",
+    "id": "julia-evans",
+    "name": "Julia Evans",
     "language": "en",
     "enabled": true,
-    "type": "github",
-    "repository": "vercel/next.js",
+    "type": "rss",
+    "url": "https://jvns.ca/atom.xml",
+    "sourceKind": "expert",
     "topics": ["developer-tools"]
   },
   {
-    "id": "arxiv-ai",
-    "name": "arXiv Computer Science — AI",
-    "language": "en",
+    "id": "github-trending",
+    "name": "GitHub Trending",
+    "language": "mixed",
     "enabled": true,
-    "type": "arxiv",
-    "category": "cs.AI",
-    "topics": ["ai"]
-  },
-  {
-    "id": "arxiv-software-engineering",
-    "name": "arXiv Software Engineering",
-    "language": "en",
-    "enabled": true,
-    "type": "arxiv",
-    "category": "cs.SE",
-    "topics": ["developer-tools"]
+    "type": "github-trending",
+    "since": "daily",
+    "topics": ["developer-tools", "tech-radar"]
   },
   {
     "id": "hacker-news",

@@ -6,8 +6,6 @@ COPY package.json package-lock.json ./
 # those platform entries inside the image while still honoring the lock.
 RUN npm install --no-audit --no-fund
 COPY . .
-ARG SITE_URL
-ENV SITE_URL=$SITE_URL
 ENV PORT=8080
 ENV AUTO_PUBLISH=false
 RUN mkdir -p src/content/daily src/content/weekly .data .cache

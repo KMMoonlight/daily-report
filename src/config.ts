@@ -15,8 +15,12 @@ const common = {
 const sourceConfigSchema = z.array(
   z.discriminatedUnion("type", [
     z.object({ ...common, type: z.literal("rss"), url: z.url(), sourceKind: z.enum(["primary", "media", "expert", "community"]) }),
-    z.object({ ...common, type: z.literal("github"), repository: z.string().regex(/^[^/]+\/[^/]+$/) }),
-    z.object({ ...common, type: z.literal("arxiv"), category: z.string().min(1) }),
+    z.object({
+      ...common,
+      type: z.literal("github-trending"),
+      since: z.enum(["daily", "weekly", "monthly"]).default("daily"),
+      spokenLanguageCode: z.string().min(2).optional(),
+    }),
     z.object({ ...common, type: z.literal("hacker-news"), minimumScore: z.number().int().nonnegative() }),
   ]),
 );

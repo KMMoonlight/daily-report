@@ -26,7 +26,7 @@ Zeabur 直接使用仓库 `Dockerfile`，监听 8080 端口；在服务设置中
 1. 确认 `.env` 中模型密钥、初筛模型和综合模型均已配置。
 2. 运行 `npm run check && npm test && npm run build`。
 3. 确认 `git status` 为空，当前分支已跟踪 GitHub 远端。
-4. 在 Zeabur 连接私有仓库，以 `Dockerfile` 部署并设置 `SITE_URL`。
+4. 在 Zeabur 连接私有仓库，以 `Dockerfile` 部署。
 5. 运行一次 `AUTO_PUBLISH=false npm run scheduler:run` 检查本地输出。
 6. 删除测试输出或正式提交后，执行 `npm run scheduler:install`。
 
