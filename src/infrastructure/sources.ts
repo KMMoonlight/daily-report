@@ -13,6 +13,8 @@ export interface CollectedItem {
   sourceKind: SourceKind;
   suggestedTopics: Topic[];
   fullTextRead?: boolean;
+  imageUrl?: string;
+  imageAlt?: string;
   normalizedUrl?: string;
   contentFingerprint?: string;
 }

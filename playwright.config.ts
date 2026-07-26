@@ -12,9 +12,10 @@ export default defineConfig({
     { name: "mobile", use: { ...devices["Pixel 7"] } },
   ],
   webServer: {
-    command: "npm run dev -- --host 127.0.0.1",
+    command: "npm run build && npm run preview -- --host 127.0.0.1 --port 4321",
     url: "http://127.0.0.1:4321",
-    reuseExistingServer: true,
+    reuseExistingServer: false,
     timeout: 120_000,
+    env: { ...process.env, CONTENT_ROOT: "./tests/fixtures/content" },
   },
 });

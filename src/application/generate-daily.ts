@@ -119,6 +119,18 @@ function renderMarkdown(report: Report) {
   return `---\n${stringify(report).trimEnd()}\n---\n\n本报告由 Tech Daily & Weekly 自动生成。\n`;
 }
 
+async function retryModel<T>(operation: () => Promise<T>, attempts = 3): Promise<T> {
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      return await operation();
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError;
+}
+
 export async function generateDaily(options: GenerateDailyOptions): Promise<DailyGenerationResult> {
   const window = shanghaiDayWindow(options.date);
   const now = options.now ?? new Date();
@@ -216,7 +228,7 @@ export async function generateDaily(options: GenerateDailyOptions): Promise<Dail
     const primary = cluster[0];
     if (!primary) continue;
     try {
-      const triage = await options.model.triage(primary);
+      const triage = await retryModel(() => options.model.triage(primary));
       if (!triage.include) {
         candidates.push(...cluster);
         continue;
@@ -225,15 +237,8 @@ export async function generateDaily(options: GenerateDailyOptions): Promise<Dail
       const independentSources = new Set(cluster.map((source) => source.sourceId)).size;
       const hasPrimarySource = cluster.some((source) => source.sourceKind === "primary");
       const lacksHighImpactVerification = triage.impact === "high" && !hasPrimarySource && independentSources < 2;
-      if (
-        lacksHighImpactVerification &&
-        cluster.every((source) => source.sourceKind === "community")
-      ) {
-        candidates.push(...cluster);
-        continue;
-      }
-      const effectiveTriage = lacksHighImpactVerification ? { ...triage, section: "radar" as const } : triage;
-      const synthesis = await options.model.synthesize(cluster, effectiveTriage);
+      const effectiveTriage = triage;
+      const synthesis = await retryModel(() => options.model.synthesize(cluster, effectiveTriage));
       const id = slugify(`${primary.externalId}-${synthesis.title}`);
       const existingStory = stories[clusterKey];
       const storyId = existingStory?.storyId ?? `story-${slugify(primary.title)}`;
@@ -244,6 +249,9 @@ export async function generateDaily(options: GenerateDailyOptions): Promise<Dail
         topics: effectiveTriage.topics,
         summary: synthesis.summary,
         analysis: synthesis.analysis,
+        ...(effectiveTriage.section === "products" && primary.imageUrl
+          ? { imageUrl: primary.imageUrl, imageAlt: primary.imageAlt ?? `${synthesis.title} 产品截图` }
+          : {}),
         publishedAt: primary.publishedAt,
         status: lacksHighImpactVerification ? "unconfirmed" : "confirmed",
         clusterId: id,

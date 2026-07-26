@@ -111,8 +111,7 @@ export async function generateWeekly(options: GenerateWeeklyOptions): Promise<We
       const triage = await options.model.triage(lateItem);
       if (!triage.include) continue;
       const unverifiedHighImpact = triage.impact === "high" && lateItem.sourceKind !== "primary";
-      if (unverifiedHighImpact && lateItem.sourceKind === "community") continue;
-      const effectiveTriage = unverifiedHighImpact ? { ...triage, section: "radar" as const } : triage;
+      const effectiveTriage = triage;
       const synthesis = await options.model.synthesize([lateItem], effectiveTriage);
       synthesizedLateItems.push(
         reportSchema.shape.items.element.parse({
@@ -122,6 +121,9 @@ export async function generateWeekly(options: GenerateWeeklyOptions): Promise<We
           topics: effectiveTriage.topics,
           summary: synthesis.summary,
           analysis: synthesis.analysis,
+          ...(effectiveTriage.section === "products" && lateItem.imageUrl
+            ? { imageUrl: lateItem.imageUrl, imageAlt: lateItem.imageAlt ?? `${synthesis.title} 产品截图` }
+            : {}),
           publishedAt: lateItem.publishedAt,
           status: unverifiedHighImpact ? "unconfirmed" : "confirmed",
           fullTextRead: lateItem.fullTextRead !== false,

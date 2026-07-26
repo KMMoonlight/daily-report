@@ -58,6 +58,27 @@ function plainText(value: unknown) {
     .trim();
 }
 
+function imageFromFeedEntry(entry: Record<string, any>) {
+  const candidates = [
+    ...asArray<Record<string, any>>(entry.thumbnail),
+    ...asArray<Record<string, any>>(entry.enclosure),
+    ...asArray<Record<string, any>>(entry.content),
+  ];
+  for (const candidate of candidates) {
+    const url = candidate?.["@_url"] ?? candidate?.["@_href"];
+    const type = String(candidate?.["@_type"] ?? "");
+    const medium = String(candidate?.["@_medium"] ?? "");
+    if (url && (medium === "image" || type.startsWith("image/") || candidate === entry.thumbnail)) {
+      try {
+        return new URL(String(url)).toString();
+      } catch {
+        // Ignore malformed feed images.
+      }
+    }
+  }
+  return undefined;
+}
+
 function responseGuard(response: Response, source: string) {
   if (!response.ok) throw new Error(`${source} returned HTTP ${response.status}`);
   return response;
@@ -90,10 +111,12 @@ export class RssAdapter implements SourceAdapter {
               ];
         const publishedAt = String(entry.pubDate ?? entry.published ?? entry.updated ?? "");
         if (!link || !publishedAt || !inWindow(publishedAt, window)) return undefined;
+        const imageUrl = imageFromFeedEntry(entry);
+        const title = plainText(entry.title?.["#text"] ?? entry.title);
         return {
           externalId: String(entry.guid?.["#text"] ?? entry.guid ?? entry.id ?? link),
           sourceId: this.id,
-          title: plainText(entry.title?.["#text"] ?? entry.title),
+          title,
           url: link,
           publishedAt: new Date(publishedAt).toISOString(),
           discoveredAt: new Date().toISOString(),
@@ -101,6 +124,7 @@ export class RssAdapter implements SourceAdapter {
           sourceKind: this.config.sourceKind,
           suggestedTopics: this.config.topics,
           fullTextRead: false,
+          ...(imageUrl ? { imageUrl, imageAlt: `${title} 产品截图` } : {}),
         };
       })
       .filter((item): item is CollectedItem => item !== undefined);
@@ -213,7 +237,7 @@ export class HackerNewsAdapter implements SourceAdapter {
         url: String(story.url ?? `https://news.ycombinator.com/item?id=${story.id}`),
         publishedAt: new Date(Number(story.time) * 1_000).toISOString(),
         discoveredAt: new Date().toISOString(),
-        excerpt: `${story.score} points on Hacker News`,
+        excerpt: plainText(story.title),
         sourceKind: "community",
         suggestedTopics: this.config.topics,
         fullTextRead: false,

@@ -1,6 +1,27 @@
 # 生产运行手册
 
-## 上线前检查
+## Docker 一键运行（推荐）
+
+```bash
+docker compose up -d --build
+```
+
+Docker 容器同时提供网站、日报/周报调度和静态站重建。以下目录必须使用持久卷：
+
+- `/app/src/content`
+- `/app/.data`
+- `/app/.cache`
+
+查看日志与停止服务：
+
+```bash
+docker compose logs -f
+docker compose down
+```
+
+Zeabur 直接使用仓库 `Dockerfile`，监听 8080 端口；在服务设置中配置模型环境变量和上述三个持久卷。
+
+## 宿主机 Git 发布（备选）
 
 1. 确认 `.env` 中模型密钥、初筛模型和综合模型均已配置。
 2. 运行 `npm run check && npm test && npm run build`。

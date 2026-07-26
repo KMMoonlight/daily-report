@@ -4,6 +4,7 @@ import { HostedLanguageModel } from "../src/infrastructure/hosted-llm";
 describe("hosted language model", () => {
   it("uses separate triage and synthesis models through an OpenAI-compatible endpoint", async () => {
     const requestedModels: string[] = [];
+    const requestedPrompts: string[] = [];
     const model = new HostedLanguageModel(
       {
         provider: "openai-compatible",
@@ -13,8 +14,12 @@ describe("hosted language model", () => {
         synthesisModel: "strong-model",
       },
       async (_input, init) => {
-        const request = JSON.parse(String(init?.body)) as { model: string };
+        const request = JSON.parse(String(init?.body)) as {
+          model: string;
+          messages: Array<{ content: string }>;
+        };
         requestedModels.push(request.model);
+        requestedPrompts.push(request.messages[0]?.content ?? "");
         const content =
           request.model === "fast-model"
             ? `{"include":true,"section":"research","topics":["ai"],"reason":"relevant"}`
@@ -40,5 +45,86 @@ describe("hosted language model", () => {
 
     expect(requestedModels).toEqual(["fast-model", "strong-model"]);
     expect(synthesis.title).toBe("标题");
+    expect(requestedPrompts[1]).toContain("摘要使用 3 至 5 句");
+    expect(requestedPrompts[1]).toContain("不能用点赞数、评论数或社区热度代替具体信息");
+  });
+
+  it("maps model-invented topics instead of rejecting the whole item", async () => {
+    const model = new HostedLanguageModel(
+      {
+        provider: "openai-compatible",
+        apiKey: "test-key",
+        baseUrl: "https://llm.example/v1",
+        triageModel: "fast-model",
+        synthesisModel: "strong-model",
+      },
+      async () =>
+        new Response(
+          JSON.stringify({
+            choices: [
+              {
+                message: {
+                  content:
+                    `{"include":true,"section":"deep-reads","topics":["networking","programming"],` +
+                    `"reason":"relevant","impact":"medium"}`,
+                },
+              },
+            ],
+          }),
+        ),
+    );
+
+    const triage = await model.triage({
+      externalId: "networking",
+      sourceId: "cloudflare",
+      title: "BGP origin manipulation",
+      url: "https://example.com/bgp",
+      publishedAt: "2026-07-25T00:00:00.000Z",
+      discoveredAt: "2026-07-25T01:00:00.000Z",
+      excerpt: "Internet routing analysis",
+      sourceKind: "primary",
+      suggestedTopics: ["developer-tools"],
+    });
+
+    expect(triage.topics).toEqual(["developer-tools"]);
+  });
+
+  it("falls back to source topics when the model omits topics", async () => {
+    const model = new HostedLanguageModel(
+      {
+        provider: "openai-compatible",
+        apiKey: "test-key",
+        baseUrl: "https://llm.example/v1",
+        triageModel: "fast-model",
+        synthesisModel: "strong-model",
+      },
+      async () =>
+        new Response(
+          JSON.stringify({
+            choices: [
+              {
+                message: {
+                  content:
+                    `{"include":true,"section":"events","reason":"relevant","impact":"medium"}`,
+                },
+              },
+            ],
+          }),
+        ),
+    );
+
+    const triage = await model.triage({
+      externalId: "release",
+      sourceId: "github",
+      title: "Framework release",
+      url: "https://example.com/release",
+      publishedAt: "2026-07-25T00:00:00.000Z",
+      discoveredAt: "2026-07-25T01:00:00.000Z",
+      excerpt: "A new release",
+      sourceKind: "primary",
+      suggestedTopics: ["developer-tools"],
+    });
+
+    expect(triage.topics).toEqual(["developer-tools"]);
   });
 });

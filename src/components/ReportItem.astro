@@ -1,88 +1,45 @@
 ---
 import type { ReportItem } from "../domain/report";
+import { composeItemBody, withoutPopularityFiller } from "../presentation/clean-copy";
 
 interface Props {
   item: ReportItem;
   compact?: boolean;
-  corrections?: Array<{ href: string; title: string }>;
   previousHref?: string | undefined;
 }
 
-const { item, compact = false, corrections = [], previousHref } = Astro.props;
+const { item, compact = false, previousHref } = Astro.props;
 
-const sectionNames = {
-  products: "产品与工具",
-  research: "研究与开源成果",
-  "deep-reads": "深度内容",
-  events: "行业动态",
-  radar: "雷达快讯",
-  corrections: "更正",
-};
-
-const topicNames = {
-  ai: "AI / 智能体",
-  "developer-tools": "开发者工具",
-  chips: "芯片 / 算力",
-  robotics: "机器人",
-  "consumer-tech": "消费科技",
-  "tech-radar": "科技雷达",
-};
 const keySources = item.sources.filter((source) => source.key);
-const supportingSources = item.sources.filter((source) => !source.key);
+const titleSource = keySources[0] ?? item.sources[0];
+const displayTitle = withoutPopularityFiller(item.title);
+const displayBody = composeItemBody(item.summary, item.analysis);
 ---
 
-<article class:list={["report-item", { compact }]} data-report-card data-section={item.section} data-topics={item.topics.join(",")} data-search={`${item.title} ${item.summary} ${item.analysis}`}>
-  <div class="item-kicker">
-    <span>{sectionNames[item.section]}</span>
-    {item.status === "unconfirmed" && <strong>未确认</strong>}
-  </div>
-  <h3 id={item.id}>{item.title}</h3>
-  <p class="summary">{item.summary}</p>
-  {!compact && item.analysis && <p class="analysis">{item.analysis}</p>}
-  {!item.fullTextRead && <p class="notice">仅基于公开摘要，未读取全文。</p>}
-  {corrections.length > 0 && (
-    <aside class="correction-notice">
-      <strong>此条目有后续更正</strong>
-      {corrections.map((correction) => <a href={correction.href}>查看更正</a>)}
-    </aside>
-  )}
-  {previousHref && <a class="story-link" href={previousHref}>← 查看此前脉络</a>}
-  <div class="item-meta">
-    <ul class="topic-list" aria-label="主题">
-      {item.topics.map((topic) => <li>{topicNames[topic]}</li>)}
-    </ul>
-    <div class="source-stack">
+<article class:list={["report-item", { compact, "has-image": item.imageUrl }]} data-report-card data-section={item.section} data-topics={item.topics.join(",")} data-search={`${displayTitle} ${displayBody}`}>
+  <header class="item-heading">
+    <h3 id={item.id}>
       {
-        keySources.map((source) => (
-          <a class="key-source" href={source.url} rel="noreferrer">
-            {source.title} ↗
-          </a>
-        ))
+        titleSource
+          ? <a class="title-link" href={titleSource.url} rel="noreferrer">{displayTitle}</a>
+          : displayTitle
       }
-      {supportingSources.length > 0 && (
-        <details class="sources">
-          <summary>补充来源 {supportingSources.length}</summary>
-          <ul>
-            {supportingSources.map((source) => (
-              <li>
-                <a href={source.url} rel="noreferrer">{source.title}</a>
-              </li>
-            ))}
-          </ul>
-        </details>
-      )}
-      {keySources.length === 0 && (
-        <details class="sources">
-          <summary>来源 {item.sources.length}</summary>
-          <ul>
-            {item.sources.map((source) => (
-              <li>
-                <a href={source.url} rel="noreferrer">{source.title}</a>
-              </li>
-            ))}
-          </ul>
-        </details>
-      )}
-    </div>
+    </h3>
+    {previousHref && <a class="story-link" href={previousHref}>← 查看此前脉络</a>}
+  </header>
+
+  <div class="item-content">
+    {item.imageUrl && item.imageAlt && (
+      <figure class="product-shot">
+        <img
+          src={item.imageUrl}
+          alt={item.imageAlt}
+          loading="lazy"
+          decoding="async"
+          referrerpolicy="no-referrer"
+        />
+      </figure>
+    )}
+    {displayBody && <p class="summary">{displayBody}</p>}
   </div>
 </article>

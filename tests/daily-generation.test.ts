@@ -119,7 +119,7 @@ describe("daily generation command", () => {
     expect(result.sourceErrors[0]).toMatch(/quarantined/i);
   });
 
-  it("downgrades a high-impact single-source claim to an unconfirmed radar item", async () => {
+  it("publishes an unverified high-impact claim without a visible declaration", async () => {
     const root = await mkdtemp(join(tmpdir(), "tech-daily-"));
     temporaryDirectories.push(root);
     const source: SourceAdapter = {
@@ -145,14 +145,14 @@ describe("daily generation command", () => {
         return { include: true, section: "events", topics: ["ai"], reason: "high impact", impact: "high" };
       },
       async synthesize() {
-        return { title: "一项尚未确认的收购消息", summary: "单一媒体报告了交易。", analysis: "尚待独立来源确认。" };
+        return { title: "一项收购交易", summary: "媒体披露了交易双方与交易范围。", analysis: "该交易可能改变相关市场格局。" };
       },
       async weeklySynthesis() {
         return "";
       },
     };
 
-    await generateDaily({
+    const result = await generateDaily({
       date: "2026-07-25",
       adapters: [source],
       model,
@@ -162,8 +162,60 @@ describe("daily generation command", () => {
     });
     const markdown = await readFile(join(root, "content", "2026-07-25.md"), "utf8");
 
-    expect(markdown).toContain("section: radar");
+    expect(result.publishedItems).toBe(1);
+    expect(result.candidateItems).toBe(0);
     expect(markdown).toContain("status: unconfirmed");
+  });
+
+  it("keeps community popularity signals out of the published report", async () => {
+    const root = await mkdtemp(join(tmpdir(), "tech-daily-"));
+    temporaryDirectories.push(root);
+    const source: SourceAdapter = {
+      id: "hacker-news",
+      async collect() {
+        return [
+          {
+            externalId: "123",
+            sourceId: "hacker-news",
+            title: "Popular discussion",
+            url: "https://example.com/project",
+            publishedAt: "2026-07-25T04:00:00.000Z",
+            discoveredAt: "2026-07-25T05:00:00.000Z",
+            excerpt: "239 points on Hacker News",
+            sourceKind: "community",
+            suggestedTopics: ["developer-tools"],
+          },
+        ];
+      },
+    };
+    const model: LanguageModel = {
+      async triage() {
+        return {
+          include: false,
+          section: "radar",
+          topics: ["developer-tools"],
+          reason: "popularity without substantive facts",
+        };
+      },
+      async synthesize() {
+        throw new Error("community-only leads must not be synthesized");
+      },
+      async weeklySynthesis() {
+        return "";
+      },
+    };
+
+    const result = await generateDaily({
+      date: "2026-07-25",
+      adapters: [source],
+      model,
+      contentDirectory: join(root, "content"),
+      cacheDirectory: join(root, "cache"),
+      dataDirectory: join(root, "data"),
+    });
+
+    expect(result.publishedItems).toBe(0);
+    expect(result.candidateItems).toBe(1);
   });
 
   it("links a later update to the previous item in the same developing story", async () => {
@@ -185,6 +237,8 @@ describe("daily generation command", () => {
             excerpt: "Update",
             sourceKind: "primary",
             suggestedTopics: ["developer-tools"],
+            imageUrl: "https://example.com/agent.png",
+            imageAlt: "Agent protocol 产品截图",
           },
         ];
       },
@@ -216,5 +270,56 @@ describe("daily generation command", () => {
 
     expect(markdown).toContain("previousItemId: day-one-agent-protocol-release");
     expect(markdown).toContain("storyId:");
+    expect(markdown).toContain("imageUrl: https://example.com/agent.png");
+    expect(markdown).toContain("imageAlt: Agent protocol 产品截图");
+  });
+
+  it("retries transient model format failures before dropping an item", async () => {
+    const root = await mkdtemp(join(tmpdir(), "tech-daily-"));
+    temporaryDirectories.push(root);
+    let triageAttempts = 0;
+    const source: SourceAdapter = {
+      id: "official",
+      async collect() {
+        return [
+          {
+            externalId: "retry",
+            sourceId: "official",
+            title: "Retryable release",
+            url: "https://example.com/retry",
+            publishedAt: "2026-07-25T04:00:00.000Z",
+            discoveredAt: "2026-07-25T05:00:00.000Z",
+            excerpt: "A release",
+            sourceKind: "primary",
+            suggestedTopics: ["developer-tools"],
+          },
+        ];
+      },
+    };
+    const model: LanguageModel = {
+      async triage() {
+        triageAttempts += 1;
+        if (triageAttempts < 3) throw new Error("malformed model response");
+        return { include: true, section: "products", topics: ["developer-tools"], reason: "relevant" };
+      },
+      async synthesize() {
+        return { title: "可重试的发布", summary: "发布摘要。", analysis: "对开发者有用。" };
+      },
+      async weeklySynthesis() {
+        return "";
+      },
+    };
+
+    const result = await generateDaily({
+      date: "2026-07-25",
+      adapters: [source],
+      model,
+      contentDirectory: join(root, "content"),
+      cacheDirectory: join(root, "cache"),
+      dataDirectory: join(root, "data"),
+    });
+
+    expect(triageAttempts).toBe(3);
+    expect(result.publishedItems).toBe(1);
   });
 });

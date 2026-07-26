@@ -1,0 +1,56 @@
+---
+import type { ReportItem, ReportSection } from "../domain/report";
+import ReportItemView from "./ReportItem.astro";
+
+interface Props {
+  items: ReportItem[];
+  compact?: boolean;
+  itemLocations?: Map<string, string>;
+}
+
+const {
+  items,
+  compact = false,
+  itemLocations = new Map(),
+} = Astro.props;
+
+const sections: Array<{
+  id: ReportSection;
+  title: string;
+}> = [
+  { id: "products", title: "新品与工具" },
+  { id: "research", title: "研究与开源" },
+  { id: "deep-reads", title: "深度阅读" },
+  { id: "events", title: "行业消息" },
+  { id: "radar", title: "简讯" },
+];
+const populatedSections = sections
+  .map((section) => ({ ...section, items: items.filter((item) => item.section === section.id) }))
+  .filter((section) => section.items.length > 0);
+---
+
+<div class="report-sections">
+  {
+    populatedSections.map((section, sectionIndex) => {
+      return (
+        <section class="report-section" data-section-group={section.id}>
+          <header class="section-heading">
+            <span class="section-number">{String(sectionIndex + 1).padStart(2, "0")}</span>
+            <div>
+              <h2>{section.title}</h2>
+            </div>
+          </header>
+          <div class="section-items">
+            {section.items.map((item) => (
+              <ReportItemView
+                item={item}
+                compact={compact}
+                previousHref={item.previousItemId ? itemLocations.get(item.previousItemId) : undefined}
+              />
+            ))}
+          </div>
+        </section>
+      );
+    })
+  }
+</div>

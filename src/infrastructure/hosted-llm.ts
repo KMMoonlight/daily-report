@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { sectionSchema, topicSchema } from "../domain/report";
+import { sectionSchema, topicSchema, type Topic } from "../domain/report";
 import type { LanguageModel, SynthesizedItem, TriageResult } from "./llm";
 import type { CollectedItem } from "./sources";
 
@@ -14,10 +14,10 @@ interface HostedLanguageModelConfig {
   synthesisModel: string;
 }
 
-const triageSchema = z.object({
+const rawTriageSchema = z.object({
   include: z.boolean(),
   section: sectionSchema.exclude(["corrections"]),
-  topics: z.array(topicSchema).min(1),
+  topics: z.array(z.string()).default([]),
   reason: z.string(),
   impact: z.enum(["low", "medium", "high"]).default("medium"),
 });
@@ -48,6 +48,47 @@ function itemContext(item: CollectedItem) {
   };
 }
 
+const topicAliases: Record<string, Topic> = {
+  "artificial-intelligence": "ai",
+  "machine-learning": "ai",
+  llm: "ai",
+  agents: "ai",
+  programming: "developer-tools",
+  software: "developer-tools",
+  "software-engineering": "developer-tools",
+  "open-source": "developer-tools",
+  cloud: "developer-tools",
+  networking: "developer-tools",
+  internet: "developer-tools",
+  security: "developer-tools",
+  databases: "developer-tools",
+  "web-development": "developer-tools",
+  semiconductors: "chips",
+  hardware: "chips",
+  compute: "chips",
+  infrastructure: "chips",
+  automotive: "robotics",
+  "autonomous-driving": "robotics",
+  "consumer-electronics": "consumer-tech",
+  mobile: "consumer-tech",
+  "internet-products": "consumer-tech",
+  biotech: "tech-radar",
+  energy: "tech-radar",
+  science: "tech-radar",
+};
+
+function normalizeTopics(values: string[], fallback: Topic[]): Topic[] {
+  const normalized = values.flatMap((value): Topic[] => {
+    const key = value.trim().toLocaleLowerCase().replaceAll("_", "-").replaceAll(" ", "-");
+    const knownTopic = topicSchema.safeParse(key);
+    if (knownTopic.success) return [knownTopic.data];
+    const alias = topicAliases[key];
+    return alias ? [alias] : [];
+  });
+  const selected: Topic[] = normalized.length ? normalized : fallback.length ? fallback : ["tech-radar"];
+  return [...new Set<Topic>(selected)];
+}
+
 export class HostedLanguageModel implements LanguageModel {
   constructor(
     private readonly config: HostedLanguageModelConfig,
@@ -58,17 +99,30 @@ export class HostedLanguageModel implements LanguageModel {
     const prompt = [
       "你是面向软件开发者的科技简报编辑。",
       "判断候选是否值得进入日报。排除与科技无关的民生和纯政治内容。",
+      "社区平台只用于发现线索；如果材料只有帖子热度、点赞或评论数，没有可核验的产品、技术或行业事实，include 必须为 false。",
+      "单一来源、证据有限或尚未得到独立验证，不是排除理由；只要事件本身具体且与科技相关即可 include。",
       "只返回 JSON：include(boolean), section(products|research|deep-reads|events|radar), topics(array), reason(string), impact(low|medium|high)。",
+      "topics 只能使用：ai、developer-tools、chips、robotics、consumer-tech、tech-radar；不得创造其他标签。",
       JSON.stringify(itemContext(item)),
     ].join("\n");
-    return triageSchema.parse(parseJson(await this.complete(this.config.triageModel, prompt)));
+    const triage = rawTriageSchema.parse(parseJson(await this.complete(this.config.triageModel, prompt)));
+    return { ...triage, topics: normalizeTopics(triage.topics, item.suggestedTopics) };
   }
 
   async synthesize(items: CollectedItem[], triage: TriageResult): Promise<SynthesizedItem> {
     const prompt = [
       "用简体中文为专业软件开发者编辑科技简报。",
       "严格区分可核验事实、来源观点和综合判断，不添加来源无法支持的事实。",
-      "只返回 JSON：title, summary, analysis。标题简洁；摘要说明发生了什么；分析说明对开发者的意义。",
+      "只返回 JSON：title, summary, analysis。标题简洁。",
+      "summary 与 analysis 会合并成一段正文展示，因此两者必须能直接首尾相接、读起来像同一篇连贯短评，不要写成互相独立的两段开场白。",
+      "summary：2 至 4 句，交代发生了什么、具体变化或能力、关键细节；直接陈述事实，不要用“一篇题为…的文章”“一款名为…的产品”这类空壳起笔。",
+      "analysis：1 至 3 句，紧接 summary 说明对开发者、技术选型或行业判断的意义；不要重复 summary，也不要以“高关注度反映出”开场。",
+      "每句话都必须提供新增信息，不要同义反复或使用空泛背景凑字数。",
+      "不要添加免责声明、“待验证”“尚待确认”等声明；只陈述来源实际提供的具体信息。",
+      "来源细节有限时可以短于建议字数，但不得杜撰，也不得用免责声明或社区热度凑内容。",
+      "不能写点赞数、评论数、Hacker News/Reddit 分数，或其他社区热度数值；也不要写“引发关注”“受到热议”“根据社区热门帖子”等空泛或抓取感表述。",
+      "不要用社区平台热度或帖子来源来证明选题价值；直接写清事实与判断。",
+      "读者应感觉这是编辑挑选后的分析，而不是按热度抓取的排行榜。",
       `栏目：${triage.section}；主题：${triage.topics.join(",")}`,
       JSON.stringify(items.map(itemContext)),
     ].join("\n");

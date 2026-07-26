@@ -18,12 +18,18 @@ describe("source adapters", () => {
       },
       async () =>
         new Response(
-          `<?xml version="1.0"?><rss><channel><item><guid>one</guid><title>Model release</title><link>https://example.com/one</link><pubDate>Sat, 25 Jul 2026 04:00:00 GMT</pubDate><description>Open weights.</description></item></channel></rss>`,
+          `<?xml version="1.0"?><rss xmlns:media="http://search.yahoo.com/mrss/"><channel><item><guid>one</guid><title>Model release</title><link>https://example.com/one</link><pubDate>Sat, 25 Jul 2026 04:00:00 GMT</pubDate><description>Open weights.</description><media:content url="https://example.com/model.png" medium="image"/></item></channel></rss>`,
         ),
     );
 
     const items = await adapter.collect(window);
-    expect(items[0]).toMatchObject({ externalId: "one", sourceId: "official", title: "Model release" });
+    expect(items[0]).toMatchObject({
+      externalId: "one",
+      sourceId: "official",
+      title: "Model release",
+      imageUrl: "https://example.com/model.png",
+      imageAlt: "Model release 产品截图",
+    });
   });
 
   it("normalizes a GitHub release", async () => {

@@ -4,47 +4,34 @@ import ReportItem from "../components/ReportItem.astro";
 import BaseLayout from "../layouts/BaseLayout.astro";
 
 const reports = (await getCollection("daily")).sort((a, b) => b.data.date.localeCompare(a.data.date));
-const weeklyReports = (await getCollection("weekly")).sort((a, b) => b.data.date.localeCompare(a.data.date));
 const entries = reports.flatMap((report) =>
   report.data.items.map((item) => ({ reportId: report.id, reportDate: report.data.date, item })),
 );
+const sections = [
+  { id: "products", title: "新品与工具" },
+  { id: "research", title: "研究与开源" },
+  { id: "deep-reads", title: "深度阅读" },
+  { id: "events", title: "行业消息" },
+  { id: "radar", title: "简讯" },
+]
+  .map((section) => ({ ...section, entries: entries.filter(({ item }) => item.section === section.id) }))
+  .filter((section) => section.entries.length > 0);
+
+const pageSize = 12;
 ---
 
 <BaseLayout title="归档 · Tech Daily & Weekly">
   <section class="archive-shell">
-    <header class="page-heading">
-      <div>
-        <p class="report-date">Archive / Search</p>
-        <h1>全部信号</h1>
-      </div>
-      <span>{reports.length} 期日报</span>
-    </header>
-
-    <section class="weekly-index" aria-labelledby="weekly-heading">
-      <h2 id="weekly-heading">周报</h2>
-      <div>
-        {
-          weeklyReports.map((report) => (
-            <a href={`/weekly/${report.id}`}>
-              <span>{report.data.date}</span>
-              <strong>{report.data.title}</strong>
-            </a>
-          ))
-        }
-      </div>
-    </section>
-
     <form class="filters" id="search" onsubmit="return false">
       <label>
         栏目
         <select name="section" aria-label="栏目">
           <option value="">全部栏目</option>
-          <option value="products">产品与工具</option>
-          <option value="research">研究与开源成果</option>
-          <option value="deep-reads">深度内容</option>
-          <option value="events">行业动态</option>
-          <option value="radar">雷达快讯</option>
-          <option value="corrections">更正</option>
+          <option value="products">新品与工具</option>
+          <option value="research">研究与开源</option>
+          <option value="deep-reads">深度阅读</option>
+          <option value="events">行业消息</option>
+          <option value="radar">简讯</option>
         </select>
       </label>
       <label>
@@ -65,45 +52,87 @@ const entries = reports.flatMap((report) =>
       </label>
     </form>
 
-    <div class="item-grid" data-archive-list>
-      {entries.map(({ reportId, reportDate, item }) => (
-        <div data-entry>
-          <a class="report-date" href={`/daily/${reportId}#${item.id}`}>{reportDate}</a>
-          <ReportItem item={item} />
-        </div>
-      ))}
+    <div class="report-sections" data-archive-list data-page-size={pageSize}>
+      {
+        sections.map((section, index) => (
+          <section class="report-section" data-archive-section={section.id}>
+            <header class="section-heading">
+              <span class="section-number">{String(index + 1).padStart(2, "0")}</span>
+              <div><h2>{section.title}</h2></div>
+            </header>
+            <div class="section-items">
+              {section.entries.map(({ reportId, reportDate, item }) => (
+                <div data-entry>
+                  <a class="report-date archive-date" href={`/daily/${reportId}#${item.id}`}>{reportDate}</a>
+                  <ReportItem item={item} />
+                </div>
+              ))}
+            </div>
+          </section>
+        ))
+      }
     </div>
     <p class="empty-state" data-empty>没有符合条件的内容。</p>
+    <button type="button" class="load-more" data-load-more hidden>加载更多</button>
   </section>
 </BaseLayout>
 
 <script>
   const form = document.querySelector<HTMLFormElement>(".filters");
+  const list = document.querySelector<HTMLElement>("[data-archive-list]");
   const entries = [...document.querySelectorAll<HTMLElement>("[data-entry]")];
+  const sections = [...document.querySelectorAll<HTMLElement>("[data-archive-section]")];
   const empty = document.querySelector<HTMLElement>("[data-empty]");
+  const loadMore = document.querySelector<HTMLButtonElement>("[data-load-more]");
+  const pageSizeAttr = () => Math.max(1, Number(list?.dataset.pageSize ?? 12) || 12);
+  let shownCount = pageSizeAttr();
 
-  function filterEntries() {
-    if (!form) return;
+  function matchedEntries() {
+    if (!form) return [];
     const data = new FormData(form);
     const section = String(data.get("section") ?? "");
     const topic = String(data.get("topic") ?? "");
     const query = String(data.get("query") ?? "").trim().toLocaleLowerCase("zh-CN");
-    let visible = 0;
 
-    for (const entry of entries) {
+    return entries.filter((entry) => {
       const card = entry.querySelector<HTMLElement>("[data-report-card]");
-      const matches =
+      return Boolean(
         card &&
-        (!section || card.dataset.section === section) &&
-        (!topic || card.dataset.topics?.split(",").includes(topic)) &&
-        (!query || card.dataset.search?.toLocaleLowerCase("zh-CN").includes(query));
-      entry.hidden = !matches;
-      if (matches) visible += 1;
-    }
-
-    if (empty) empty.style.display = visible ? "none" : "block";
+          (!section || card.dataset.section === section) &&
+          (!topic || card.dataset.topics?.split(",").includes(topic)) &&
+          (!query || card.dataset.search?.toLocaleLowerCase("zh-CN").includes(query)),
+      );
+    });
   }
 
-  form?.addEventListener("input", filterEntries);
-  form?.addEventListener("change", filterEntries);
+  function refreshView() {
+    const matched = matchedEntries();
+    const visibleSet = new Set(matched.slice(0, shownCount));
+
+    for (const entry of entries) {
+      entry.hidden = !visibleSet.has(entry);
+    }
+    for (const sectionGroup of sections) {
+      sectionGroup.hidden = ![...sectionGroup.querySelectorAll<HTMLElement>("[data-entry]")].some(
+        (entry) => !entry.hidden,
+      );
+    }
+
+    if (empty) empty.style.display = matched.length ? "none" : "block";
+    if (loadMore) loadMore.hidden = matched.length <= shownCount;
+  }
+
+  function resetAndRefresh() {
+    shownCount = pageSizeAttr();
+    refreshView();
+  }
+
+  form?.addEventListener("input", resetAndRefresh);
+  form?.addEventListener("change", resetAndRefresh);
+  loadMore?.addEventListener("click", () => {
+    shownCount += pageSizeAttr();
+    refreshView();
+  });
+
+  refreshView();
 </script>

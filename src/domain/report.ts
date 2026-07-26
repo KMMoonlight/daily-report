@@ -43,6 +43,8 @@ export const reportItemSchema = z
     topics: z.array(topicSchema).min(1),
     summary: z.string().min(1),
     analysis: z.string().default(""),
+    imageUrl: z.url().optional(),
+    imageAlt: z.string().min(1).optional(),
     publishedAt: dateTimeSchema,
     status: z.enum(["confirmed", "unconfirmed", "corrected"]).default("confirmed"),
     sources: z.array(sourceSchema).min(1),
@@ -55,6 +57,20 @@ export const reportItemSchema = z
     fullTextRead: z.boolean().default(true),
   })
   .superRefine((item, context) => {
+    if (Boolean(item.imageUrl) !== Boolean(item.imageAlt)) {
+      context.addIssue({
+        code: "custom",
+        path: ["imageUrl"],
+        message: "imageUrl and imageAlt must be provided together",
+      });
+    }
+    if (item.imageUrl && item.section !== "products") {
+      context.addIssue({
+        code: "custom",
+        path: ["imageUrl"],
+        message: "Only product and tool items may display screenshots",
+      });
+    }
     if (item.section === "corrections") {
       for (const [field, value] of [
         ["correctsItemId", item.correctsItemId],

@@ -14,7 +14,8 @@
     "generate:daily": "tsx src/cli/daily.ts",
     "generate:weekly": "tsx src/cli/weekly.ts",
     "scheduler:run": "tsx src/cli/scheduler.ts",
-    "scheduler:install": "tsx src/cli/install-scheduler.ts"
+    "scheduler:install": "tsx src/cli/install-scheduler.ts",
+    "container:start": "tsx src/cli/container.ts"
   },
   "dependencies": {
     "@astrojs/check": "^0.9.9",

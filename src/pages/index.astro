@@ -1,52 +1,33 @@
 ---
 import { getCollection } from "astro:content";
-import ReportItem from "../components/ReportItem.astro";
 import BaseLayout from "../layouts/BaseLayout.astro";
 
-const dailyReports = (await getCollection("daily")).sort((a, b) => b.data.date.localeCompare(a.data.date));
-const weeklyReports = (await getCollection("weekly")).sort((a, b) => b.data.date.localeCompare(a.data.date));
-const latestDaily = dailyReports[0];
-const latestWeekly = weeklyReports[0];
+const recentDailyReports = (await getCollection("daily"))
+  .sort((a, b) => b.data.date.localeCompare(a.data.date))
+  .slice(0, 7);
 ---
 
 <BaseLayout>
   <section class="hero">
-    <div>
-      <p class="eyebrow">Daily signal · Weekly context</p>
-      <h1>今天，科技世界改变了什么？</h1>
-      <p class="hero-copy">从中英文一手来源、研究、代码与技术社区中提取值得开发者持续关注的变化。</p>
-    </div>
-    <aside class="hero-aside">
-      <p>不是新闻瀑布。每条信息经过聚合、核验与编辑，只保留能改变理解的部分。</p>
-      {latestDaily && <a class="button-link" href={`/daily/${latestDaily.id}`}>阅读最新日报</a>}
-    </aside>
+    <p class="eyebrow">Daily signal · Weekly context</p>
+    <h1>今天，科技世界改变了什么？</h1>
+    {
+      recentDailyReports.length > 0 ? (
+        <nav class="recent-editions" aria-label="最近日报">
+          <ul>
+            {recentDailyReports.map((report, index) => (
+              <li>
+                <a href={`/daily/${report.id}`}>
+                  <span class="report-date">{report.data.date}</span>
+                  <strong>{index === 0 ? "最新日报" : report.data.title}</strong>
+                </a>
+              </li>
+            ))}
+          </ul>
+        </nav>
+      ) : (
+        <p class="hero-empty">暂无日报。</p>
+      )
+    }
   </section>
-
-  {latestDaily && (
-    <section class="edition">
-      <header class="edition-header">
-        <div>
-          <p class="report-date">{latestDaily.data.date}</p>
-          <h2>最新日报</h2>
-        </div>
-        <a href={`/daily/${latestDaily.id}`}>完整阅读 →</a>
-      </header>
-      <div class="item-grid">
-        {latestDaily.data.items.slice(0, 4).map((item) => <ReportItem item={item} compact />)}
-      </div>
-    </section>
-  )}
-
-  {latestWeekly && (
-    <section class="edition">
-      <header class="edition-header">
-        <div>
-          <p class="report-date">{latestWeekly.data.date}</p>
-          <h2>一周趋势</h2>
-        </div>
-        <a href={`/weekly/${latestWeekly.id}`}>打开周报 →</a>
-      </header>
-      <p class="report-intro">{latestWeekly.data.trendSummary}</p>
-    </section>
-  )}
 </BaseLayout>
