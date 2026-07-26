@@ -159,7 +159,9 @@ export async function generateDaily(options: GenerateDailyOptions): Promise<Dail
 
   for (const adapter of options.adapters) {
     try {
+      process.stdout.write(`Collecting source ${adapter.id}...\n`);
       const items = (await adapter.collect(window)).map(normalizeCollectedItem);
+      process.stdout.write(`Collected ${items.length} items from ${adapter.id}\n`);
       const previous = volumes[adapter.id]?.samples ?? [];
       const average = previous.length ? previous.reduce((total, value) => total + value, 0) / previous.length : items.length;
       const threshold = Math.max(50, average * 5);
@@ -171,9 +173,12 @@ export async function generateDaily(options: GenerateDailyOptions): Promise<Dail
       volumes[adapter.id] = { samples: [...previous, items.length].slice(-14), quarantinedAt: null };
       collected.push(...items);
     } catch (error) {
-      sourceErrors.push(`${adapter.id}: ${error instanceof Error ? error.message : String(error)}`);
+      const message = error instanceof Error ? error.message : String(error);
+      process.stdout.write(`Source ${adapter.id} failed: ${message}\n`);
+      sourceErrors.push(`${adapter.id}: ${message}`);
     }
   }
+  process.stdout.write(`Collection finished with ${collected.length} items; starting triage/synthesis...\n`);
   await writeFile(volumePath, JSON.stringify(volumes, null, 2));
   const storiesPath = join(options.dataDirectory, "stories.json");
   let stories: StoryState = {};
@@ -281,6 +286,17 @@ export async function generateDaily(options: GenerateDailyOptions): Promise<Dail
   const uniqueCandidates = [...new Map(candidates.map((item) => [`${item.sourceId}:${item.externalId}`, item])).values()];
   await writeFile(candidatesPath, JSON.stringify(uniqueCandidates, null, 2));
   await writeFile(storiesPath, JSON.stringify(stories, null, 2));
+
+  if (published.length === 0) {
+    return {
+      date: options.date,
+      publishedItems: 0,
+      candidateItems: uniqueCandidates.length,
+      failedItems,
+      sourceErrors,
+      outputPath,
+    };
+  }
 
   const report = reportSchema.parse({
     kind: "daily",

@@ -141,6 +141,7 @@ export class HostedLanguageModel implements LanguageModel {
 
   private async complete(model: string, prompt: string) {
     const { provider, apiKey, baseUrl } = this.config;
+    const signal = AbortSignal.timeout(120_000);
     let response: Response;
 
     if (provider === "anthropic") {
@@ -152,6 +153,7 @@ export class HostedLanguageModel implements LanguageModel {
           "anthropic-version": "2023-06-01",
         },
         body: JSON.stringify({ model, max_tokens: 2_000, messages: [{ role: "user", content: prompt }] }),
+        signal,
       });
     } else if (provider === "gemini") {
       response = await this.fetcher(
@@ -160,6 +162,7 @@ export class HostedLanguageModel implements LanguageModel {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
+          signal,
         },
       );
     } else {
@@ -171,6 +174,7 @@ export class HostedLanguageModel implements LanguageModel {
           response_format: { type: "json_object" },
           messages: [{ role: "user", content: prompt }],
         }),
+        signal,
       });
     }
 

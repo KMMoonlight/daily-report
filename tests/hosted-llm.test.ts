@@ -45,8 +45,8 @@ describe("hosted language model", () => {
 
     expect(requestedModels).toEqual(["fast-model", "strong-model"]);
     expect(synthesis.title).toBe("标题");
-    expect(requestedPrompts[1]).toContain("摘要使用 3 至 5 句");
-    expect(requestedPrompts[1]).toContain("不能用点赞数、评论数或社区热度代替具体信息");
+    expect(requestedPrompts[1]).toContain("summary 与 analysis 会合并成一段正文展示");
+    expect(requestedPrompts[1]).toContain("不能写点赞数、评论数、Hacker News/Reddit 分数");
   });
 
   it("maps model-invented topics instead of rejecting the whole item", async () => {

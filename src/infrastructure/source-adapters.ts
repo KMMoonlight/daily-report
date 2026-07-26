@@ -80,6 +80,10 @@ function responseGuard(response: Response, source: string) {
   return response;
 }
 
+async function fetchWithTimeout(fetcher: FetchLike, input: string, init?: RequestInit, timeoutMs = 20_000) {
+  return fetcher(input, { ...init, signal: AbortSignal.timeout(timeoutMs) });
+}
+
 export class RssAdapter implements SourceAdapter {
   readonly id: string;
 
@@ -91,7 +95,7 @@ export class RssAdapter implements SourceAdapter {
   }
 
   async collect(window: CollectionWindow): Promise<CollectedItem[]> {
-    const response = responseGuard(await this.fetcher(this.config.url), this.id);
+    const response = responseGuard(await fetchWithTimeout(this.fetcher, this.config.url), this.id);
     const document = xmlParser.parse(await response.text()) as Record<string, any>;
     const entries = document.rss
       ? asArray<Record<string, any>>(document.rss.channel?.item)
@@ -142,12 +146,12 @@ export class GitHubTrendingAdapter implements SourceAdapter {
     const params = new URLSearchParams({ since });
     if (this.config.spokenLanguageCode) params.set("spoken_language_code", this.config.spokenLanguageCode);
     const response = responseGuard(
-      await this.fetcher(`https://github.com/trending?${params.toString()}`, {
+      await fetchWithTimeout(this.fetcher, `https://github.com/trending?${params.toString()}`, {
         headers: {
           Accept: "text/html",
           "User-Agent": "TechDailyWeekly/1.0 (+https://github.com/trending)",
         },
-      }),
+      }, 30_000),
       this.id,
     );
     const html = await response.text();
@@ -206,14 +210,14 @@ export class HackerNewsAdapter implements SourceAdapter {
 
   async collect(window: CollectionWindow): Promise<CollectedItem[]> {
     const idsResponse = responseGuard(
-      await this.fetcher("https://hacker-news.firebaseio.com/v0/topstories.json"),
+      await fetchWithTimeout(this.fetcher, "https://hacker-news.firebaseio.com/v0/topstories.json"),
       this.id,
     );
     const ids = ((await idsResponse.json()) as number[]).slice(0, 100);
     const stories = await Promise.all(
       ids.map(async (id) => {
         const response = responseGuard(
-          await this.fetcher(`https://hacker-news.firebaseio.com/v0/item/${id}.json`),
+          await fetchWithTimeout(this.fetcher, `https://hacker-news.firebaseio.com/v0/item/${id}.json`),
           this.id,
         );
         return (await response.json()) as Record<string, any>;

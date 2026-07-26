@@ -34,6 +34,21 @@ const result = await runScheduledGeneration({
       cacheDirectory: paths.cache,
       dataDirectory: paths.data,
     });
+    process.stdout.write(
+      `${JSON.stringify({
+        event: "daily-generation",
+        date,
+        publishedItems: generation.publishedItems,
+        candidateItems: generation.candidateItems,
+        failedItems: generation.failedItems,
+        sourceErrors: generation.sourceErrors,
+      })}\n`,
+    );
+    if (generation.publishedItems === 0) {
+      throw new Error(
+        `Daily ${date} produced 0 publishable items (failedItems=${generation.failedItems}; sourceErrors=${generation.sourceErrors.join(" | ") || "none"})`,
+      );
+    }
     return generation.failedItems > 0 || generation.sourceErrors.length > 0 ? "partial" : "success";
   },
   async generateWeekly(weekStart) {
