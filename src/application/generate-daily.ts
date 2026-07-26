@@ -1,7 +1,7 @@
 import { access, mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { stringify } from "yaml";
-import { reportSchema, type Report } from "../domain/report";
+import { reportSchema, type Report, type ReportItem } from "../domain/report";
 import type { LanguageModel } from "../infrastructure/llm";
 import type { CollectedItem, SourceAdapter } from "../infrastructure/sources";
 import {

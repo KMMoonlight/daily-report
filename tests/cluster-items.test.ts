@@ -32,6 +32,7 @@ function reportItem(title: string, summary: string, url: string): ReportItem {
     analysis: "影响开发者选型。",
     publishedAt: "2026-07-25T04:00:00.000Z",
     status: "confirmed",
+    fullTextRead: false,
     sources: [{ title, url, kind: "media", key: true }],
   };
 }
