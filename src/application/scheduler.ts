@@ -4,6 +4,12 @@ import { dirname } from "node:path";
 interface Ledger {
   successfulDailyDates: string[];
   successfulWeeks: string[];
+  runs?: Array<{
+    kind: "daily" | "weekly";
+    period: string;
+    status: "started" | "success" | "partial" | "failed";
+    at: string;
+  }>;
 }
 
 interface SchedulerOptions {
@@ -11,8 +17,8 @@ interface SchedulerOptions {
   startDate?: string;
   ledgerPath: string;
   logPath: string;
-  generateDaily(date: string): Promise<void>;
-  generateWeekly(weekStart: string): Promise<void>;
+  generateDaily(date: string): Promise<void | "success" | "partial">;
+  generateWeekly(weekStart: string): Promise<void | "success" | "partial">;
 }
 
 export interface SchedulerResult {
@@ -77,6 +83,7 @@ export async function runScheduledGeneration(options: SchedulerOptions): Promise
   const targetDailyDate = addDays(today, -1);
   const existingLedger = await readLedger(options.ledgerPath);
   const ledger: Ledger = existingLedger ?? { successfulDailyDates: [], successfulWeeks: [] };
+  ledger.runs ??= [];
   const firstDate =
     options.startDate ??
     (ledger.successfulDailyDates.length
@@ -95,15 +102,25 @@ export async function runScheduledGeneration(options: SchedulerOptions): Promise
   if (firstDate <= targetDailyDate) {
     for (const date of datesBetween(firstDate, targetDailyDate)) {
       if (ledger.successfulDailyDates.includes(date)) continue;
+      ledger.runs.push({ kind: "daily", period: date, status: "started", at: now.toISOString() });
+      await persist();
       try {
-        await retry(() => options.generateDaily(date));
+        const generationStatus = await retry(() => options.generateDaily(date));
         ledger.successfulDailyDates.push(date);
         ledger.successfulDailyDates.sort();
+        ledger.runs.push({
+          kind: "daily",
+          period: date,
+          status: generationStatus === "partial" ? "partial" : "success",
+          at: now.toISOString(),
+        });
         result.completedDailyDates.push(date);
         await persist();
         await log({ event: "daily-succeeded", date });
       } catch (error) {
         result.failedDailyDate = date;
+        ledger.runs.push({ kind: "daily", period: date, status: "failed", at: now.toISOString() });
+        await persist();
         await log({ event: "daily-failed", date, error: error instanceof Error ? error.message : String(error) });
         return result;
       }
@@ -121,15 +138,25 @@ export async function runScheduledGeneration(options: SchedulerOptions): Promise
   if (weekday === "Mon" && hour >= 10) {
     const weekStart = previousMonday(today);
     if (!ledger.successfulWeeks.includes(weekStart)) {
+      ledger.runs.push({ kind: "weekly", period: weekStart, status: "started", at: now.toISOString() });
+      await persist();
       try {
-        await retry(() => options.generateWeekly(weekStart));
+        const generationStatus = await retry(() => options.generateWeekly(weekStart));
         ledger.successfulWeeks.push(weekStart);
         ledger.successfulWeeks.sort();
+        ledger.runs.push({
+          kind: "weekly",
+          period: weekStart,
+          status: generationStatus === "partial" ? "partial" : "success",
+          at: now.toISOString(),
+        });
         result.completedWeeks.push(weekStart);
         await persist();
         await log({ event: "weekly-succeeded", weekStart });
       } catch (error) {
         result.failedWeek = weekStart;
+        ledger.runs.push({ kind: "weekly", period: weekStart, status: "failed", at: now.toISOString() });
+        await persist();
         await log({ event: "weekly-failed", weekStart, error: error instanceof Error ? error.message : String(error) });
       }
     }

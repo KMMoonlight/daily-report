@@ -14,7 +14,9 @@ function item(id: string, correctsItemId?: string): ReportItem {
     status: correctsItemId ? "corrected" : "confirmed",
     sources: [{ title: "source", url: "https://example.com", kind: "primary", key: true }],
     fullTextRead: true,
-    ...(correctsItemId ? { correctsItemId, correctionReason: "reason" } : {}),
+    ...(correctsItemId
+      ? { correctsItemId, correctionReason: "reason", correctionDiscoveredAt: "2026-07-26T00:00:00.000Z" }
+      : {}),
   };
 }
 

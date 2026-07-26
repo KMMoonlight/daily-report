@@ -1,4 +1,5 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
+import { access, mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { stringify } from "yaml";
 import { reportSchema, type Report, type ReportItem } from "../domain/report";
@@ -65,16 +66,44 @@ function canonicalUrl(value: string) {
   return url.toString();
 }
 
+function titleTokens(title: string) {
+  return new Set(normalizeTitle(title).split(" ").filter(Boolean));
+}
+
+function titleSimilarity(left: string, right: string) {
+  const leftTokens = titleTokens(left);
+  const rightTokens = titleTokens(right);
+  const intersection = [...leftTokens].filter((token) => rightTokens.has(token)).length;
+  const union = new Set([...leftTokens, ...rightTokens]).size;
+  return union ? intersection / union : 0;
+}
+
+function normalizeCollectedItem(item: CollectedItem): CollectedItem {
+  const normalizedUrl = canonicalUrl(item.url);
+  const contentFingerprint = createHash("sha256")
+    .update(`${normalizeTitle(item.title)}\n${item.excerpt.trim().toLocaleLowerCase()}`)
+    .digest("hex");
+  return { ...item, normalizedUrl, contentFingerprint };
+}
+
 function clusterItems(items: CollectedItem[]) {
-  const clusters = new Map<string, CollectedItem[]>();
+  const clusters: CollectedItem[][] = [];
   for (const item of items) {
-    const normalizedTitle = normalizeTitle(item.title);
-    const key = normalizedTitle || canonicalUrl(item.url);
-    const cluster = clusters.get(key) ?? [];
-    cluster.push(item);
-    clusters.set(key, cluster);
+    const existing = clusters.find((cluster) =>
+      cluster.some(
+        (candidate) =>
+          candidate.normalizedUrl === item.normalizedUrl ||
+          candidate.contentFingerprint === item.contentFingerprint ||
+          titleSimilarity(candidate.title, item.title) >= 0.7,
+      ),
+    );
+    if (existing) existing.push(item);
+    else clusters.push([item]);
   }
-  return [...clusters.entries()].map(([key, cluster]) => ({ key, items: cluster }));
+  return clusters.map((cluster) => ({
+    key: normalizeTitle(cluster[0]?.title ?? "") || cluster[0]?.contentFingerprint || "",
+    items: cluster,
+  }));
 }
 
 function slugify(value: string) {
@@ -101,6 +130,13 @@ export async function generateDaily(options: GenerateDailyOptions): Promise<Dail
     mkdir(options.cacheDirectory, { recursive: true }),
     mkdir(options.dataDirectory, { recursive: true }),
   ]);
+  const outputPath = join(options.contentDirectory, `${options.date}.md`);
+  try {
+    await access(outputPath);
+    throw new Error(`Refusing to overwrite immutable daily report: ${outputPath}`);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+  }
   const volumePath = join(options.dataDirectory, "source-volumes.json");
   let volumes: SourceVolumeState = {};
   try {
@@ -111,7 +147,7 @@ export async function generateDaily(options: GenerateDailyOptions): Promise<Dail
 
   for (const adapter of options.adapters) {
     try {
-      const items = await adapter.collect(window);
+      const items = (await adapter.collect(window)).map(normalizeCollectedItem);
       const previous = volumes[adapter.id]?.samples ?? [];
       const average = previous.length ? previous.reduce((total, value) => total + value, 0) / previous.length : items.length;
       const threshold = Math.max(50, average * 5);
@@ -167,7 +203,9 @@ export async function generateDaily(options: GenerateDailyOptions): Promise<Dail
     if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
   }
   const currentClusterKeys = new Set(inWindow.map((item) => normalizeTitle(item.title)));
-  const reconsideredCandidates = existingCandidates.filter((item) => currentClusterKeys.has(normalizeTitle(item.title)));
+  const reconsideredCandidates = existingCandidates
+    .filter((item) => currentClusterKeys.has(normalizeTitle(item.title)))
+    .map(normalizeCollectedItem);
   const retainedCandidates = existingCandidates.filter((item) => !currentClusterKeys.has(normalizeTitle(item.title)));
 
   const published: ReportItem[] = [];
@@ -238,8 +276,7 @@ export async function generateDaily(options: GenerateDailyOptions): Promise<Dail
     coverageEnd: window.end.toISOString(),
     items: published,
   });
-  const outputPath = join(options.contentDirectory, `${options.date}.md`);
-  await writeFile(outputPath, renderMarkdown(report));
+  await writeFile(outputPath, renderMarkdown(report), { flag: "wx" });
 
   return {
     date: options.date,

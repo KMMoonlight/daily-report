@@ -26,7 +26,7 @@ const result = await runScheduledGeneration({
   ledgerPath: resolve(paths.data, "ledger.json"),
   logPath: resolve(paths.data, "runs.jsonl"),
   async generateDaily(date) {
-    await generateDaily({
+    const generation = await generateDaily({
       date,
       adapters,
       model,
@@ -34,6 +34,7 @@ const result = await runScheduledGeneration({
       cacheDirectory: paths.cache,
       dataDirectory: paths.data,
     });
+    return generation.failedItems > 0 || generation.sourceErrors.length > 0 ? "partial" : "success";
   },
   async generateWeekly(weekStart) {
     await generateWeekly({
@@ -44,6 +45,7 @@ const result = await runScheduledGeneration({
       dataDirectory: paths.data,
       model,
     });
+    return "success";
   },
 });
 

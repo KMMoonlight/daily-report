@@ -1,4 +1,4 @@
-import { readdir, readFile, unlink, writeFile, mkdir } from "node:fs/promises";
+import { access, readdir, readFile, unlink, writeFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import matter from "gray-matter";
 import { stringify } from "yaml";
@@ -74,6 +74,14 @@ function signalId(value: string) {
 }
 
 export async function generateWeekly(options: GenerateWeeklyOptions): Promise<WeeklyGenerationResult> {
+  await mkdir(options.weeklyContentDirectory, { recursive: true });
+  const outputPath = join(options.weeklyContentDirectory, `${isoWeek(options.weekStart)}.md`);
+  try {
+    await access(outputPath);
+    throw new Error(`Refusing to overwrite immutable weekly report: ${outputPath}`);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+  }
   const start = shanghaiDayWindow(options.weekStart).start;
   const end = new Date(start.valueOf() + 7 * 86_400_000 - 1);
   const publishDate = dateString(new Date(end.valueOf() + 1));
@@ -146,9 +154,9 @@ export async function generateWeekly(options: GenerateWeeklyOptions): Promise<We
     items,
   });
 
-  await mkdir(options.weeklyContentDirectory, { recursive: true });
-  const outputPath = join(options.weeklyContentDirectory, `${isoWeek(options.weekStart)}.md`);
-  await writeFile(outputPath, `---\n${stringify(report).trimEnd()}\n---\n\n本周报由一周信息簇综合生成。\n`);
+  await writeFile(outputPath, `---\n${stringify(report).trimEnd()}\n---\n\n本周报由一周信息簇综合生成。\n`, {
+    flag: "wx",
+  });
   if (lateItemsPath) {
     const retainedLateItems = lateItems.filter((item) => {
       const publishedAt = new Date(item.publishedAt).valueOf();

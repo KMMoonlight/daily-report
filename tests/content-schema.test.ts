@@ -46,4 +46,17 @@ describe("report content contract", () => {
 
     expect(result.success).toBe(false);
   });
+
+  it("requires complete correction metadata and a key source", () => {
+    const result = reportSchema.safeParse({
+      kind: "daily",
+      title: "Correction",
+      date: "2026-07-26",
+      coverageStart: "2026-07-25T16:00:00.000Z",
+      coverageEnd: "2026-07-26T15:59:59.999Z",
+      items: [{ ...validItem, id: "fix", section: "corrections", correctsItemId: "open-model-release" }],
+    });
+
+    expect(result.success).toBe(false);
+  });
 });

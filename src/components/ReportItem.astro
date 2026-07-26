@@ -27,6 +27,8 @@ const topicNames = {
   "consumer-tech": "消费科技",
   "tech-radar": "科技雷达",
 };
+const keySources = item.sources.filter((source) => source.key);
+const supportingSources = item.sources.filter((source) => !source.key);
 ---
 
 <article class:list={["report-item", { compact }]} data-report-card data-section={item.section} data-topics={item.topics.join(",")} data-search={`${item.title} ${item.summary} ${item.analysis}`}>
@@ -49,16 +51,38 @@ const topicNames = {
     <ul class="topic-list" aria-label="主题">
       {item.topics.map((topic) => <li>{topicNames[topic]}</li>)}
     </ul>
-    <details class="sources">
-      <summary>来源 {item.sources.length}</summary>
-      <ul>
-        {item.sources.map((source) => (
-          <li>
-            <a href={source.url} rel="noreferrer">{source.title}</a>
-            {source.key && <span>关键来源</span>}
-          </li>
-        ))}
-      </ul>
-    </details>
+    <div class="source-stack">
+      {
+        keySources.map((source) => (
+          <a class="key-source" href={source.url} rel="noreferrer">
+            {source.title} ↗
+          </a>
+        ))
+      }
+      {supportingSources.length > 0 && (
+        <details class="sources">
+          <summary>补充来源 {supportingSources.length}</summary>
+          <ul>
+            {supportingSources.map((source) => (
+              <li>
+                <a href={source.url} rel="noreferrer">{source.title}</a>
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
+      {keySources.length === 0 && (
+        <details class="sources">
+          <summary>来源 {item.sources.length}</summary>
+          <ul>
+            {item.sources.map((source) => (
+              <li>
+                <a href={source.url} rel="noreferrer">{source.title}</a>
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
+    </div>
   </div>
 </article>

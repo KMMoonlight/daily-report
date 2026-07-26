@@ -10,6 +10,18 @@ export async function getStaticPaths() {
 
 const { report } = Astro.props;
 const { Content } = await render(report);
+const allDailyReports = await getCollection("daily");
+const correctionsByOriginal = new Map<string, Array<{ href: string; title: string }>>();
+const itemLocations = new Map<string, string>();
+for (const dailyReport of allDailyReports) {
+  for (const item of dailyReport.data.items) {
+    itemLocations.set(item.id, `/daily/${dailyReport.id}#${item.id}`);
+    if (!item.correctsItemId) continue;
+    const corrections = correctionsByOriginal.get(item.correctsItemId) ?? [];
+    corrections.push({ href: `/daily/${dailyReport.id}#${item.id}`, title: item.title });
+    correctionsByOriginal.set(item.correctsItemId, corrections);
+  }
+}
 ---
 
 <BaseLayout title={`${report.data.title} · Tech Daily & Weekly`}>
@@ -24,7 +36,15 @@ const { Content } = await render(report);
     {report.data.trendSummary && <p class="report-intro">{report.data.trendSummary}</p>}
     <div class="report-intro"><Content /></div>
     <div class="item-grid">
-      {report.data.items.map((item) => <ReportItem item={item} />)}
+      {
+        report.data.items.map((item) => (
+          <ReportItem
+            item={item}
+            corrections={correctionsByOriginal.get(item.id) ?? []}
+            previousHref={item.previousItemId ? itemLocations.get(item.previousItemId) : undefined}
+          />
+        ))
+      }
     </div>
   </article>
 </BaseLayout>

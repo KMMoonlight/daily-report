@@ -51,14 +51,37 @@ export const reportItemSchema = z
     previousItemId: z.string().optional(),
     correctsItemId: z.string().optional(),
     correctionReason: z.string().optional(),
+    correctionDiscoveredAt: dateTimeSchema.optional(),
     fullTextRead: z.boolean().default(true),
   })
   .superRefine((item, context) => {
-    if (item.section === "corrections" && !item.correctsItemId) {
+    if (item.section === "corrections") {
+      for (const [field, value] of [
+        ["correctsItemId", item.correctsItemId],
+        ["correctionReason", item.correctionReason],
+        ["correctionDiscoveredAt", item.correctionDiscoveredAt],
+      ] as const) {
+        if (!value) {
+          context.addIssue({
+            code: "custom",
+            path: [field],
+            message: `A correction requires ${field}`,
+          });
+        }
+      }
+    }
+    if (["products", "research", "deep-reads", "corrections"].includes(item.section) && !item.sources.some((source) => source.key)) {
       context.addIssue({
         code: "custom",
-        path: ["correctsItemId"],
-        message: "A correction must reference the original item",
+        path: ["sources"],
+        message: `${item.section} requires a key source`,
+      });
+    }
+    if (item.section !== "radar" && !item.analysis.trim()) {
+      context.addIssue({
+        code: "custom",
+        path: ["analysis"],
+        message: `${item.section} requires analysis`,
       });
     }
   });

@@ -6,6 +6,9 @@ type FetchLike = (input: string | URL | Request, init?: RequestInit) => Promise<
 
 interface CommonConfig {
   id: string;
+  name?: string;
+  language?: "zh" | "en" | "mixed";
+  enabled?: boolean;
   topics: Topic[];
 }
 

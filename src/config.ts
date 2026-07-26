@@ -6,6 +6,9 @@ import type { SourceConfig } from "./infrastructure/source-adapters";
 
 const common = {
   id: z.string().min(1),
+  name: z.string().min(1).optional(),
+  language: z.enum(["zh", "en", "mixed"]).default("en"),
+  enabled: z.boolean().default(true),
   topics: z.array(topicSchema).min(1),
 };
 
@@ -20,7 +23,7 @@ const sourceConfigSchema = z.array(
 
 export async function loadSourceConfig(path = resolve("config/sources.json")): Promise<SourceConfig[]> {
   const data = JSON.parse(await readFile(path, "utf8")) as unknown;
-  return sourceConfigSchema.parse(data) as SourceConfig[];
+  return (sourceConfigSchema.parse(data) as SourceConfig[]).filter((source) => source.enabled !== false);
 }
 
 export function projectPaths(root = process.cwd()) {

@@ -1,6 +1,9 @@
 [
   {
     "id": "openai-news",
+    "name": "OpenAI News",
+    "language": "en",
+    "enabled": true,
     "type": "rss",
     "url": "https://openai.com/news/rss.xml",
     "sourceKind": "primary",
@@ -8,6 +11,9 @@
   },
   {
     "id": "github-changelog",
+    "name": "GitHub Changelog",
+    "language": "en",
+    "enabled": true,
     "type": "rss",
     "url": "https://github.blog/changelog/feed/",
     "sourceKind": "primary",
@@ -15,6 +21,9 @@
   },
   {
     "id": "cloudflare-blog",
+    "name": "Cloudflare Blog",
+    "language": "en",
+    "enabled": true,
     "type": "rss",
     "url": "https://blog.cloudflare.com/rss/",
     "sourceKind": "primary",
@@ -22,6 +31,9 @@
   },
   {
     "id": "nvidia-blog",
+    "name": "NVIDIA Blog",
+    "language": "en",
+    "enabled": true,
     "type": "rss",
     "url": "https://blogs.nvidia.com/feed/",
     "sourceKind": "primary",
@@ -29,6 +41,9 @@
   },
   {
     "id": "ieee-robotics",
+    "name": "IEEE Spectrum Robotics",
+    "language": "en",
+    "enabled": true,
     "type": "rss",
     "url": "https://spectrum.ieee.org/feeds/topic/robotics.rss",
     "sourceKind": "media",
@@ -36,6 +51,9 @@
   },
   {
     "id": "apple-newsroom",
+    "name": "Apple Newsroom",
+    "language": "en",
+    "enabled": true,
     "type": "rss",
     "url": "https://www.apple.com/newsroom/rss-feed.rss",
     "sourceKind": "primary",
@@ -43,30 +61,45 @@
   },
   {
     "id": "ollama-releases",
+    "name": "Ollama Releases",
+    "language": "en",
+    "enabled": true,
     "type": "github",
     "repository": "ollama/ollama",
     "topics": ["ai", "developer-tools"]
   },
   {
     "id": "nextjs-releases",
+    "name": "Next.js Releases",
+    "language": "en",
+    "enabled": true,
     "type": "github",
     "repository": "vercel/next.js",
     "topics": ["developer-tools"]
   },
   {
     "id": "arxiv-ai",
+    "name": "arXiv Computer Science — AI",
+    "language": "en",
+    "enabled": true,
     "type": "arxiv",
     "category": "cs.AI",
     "topics": ["ai"]
   },
   {
     "id": "arxiv-software-engineering",
+    "name": "arXiv Software Engineering",
+    "language": "en",
+    "enabled": true,
     "type": "arxiv",
     "category": "cs.SE",
     "topics": ["developer-tools"]
   },
   {
     "id": "hacker-news",
+    "name": "Hacker News",
+    "language": "en",
+    "enabled": true,
     "type": "hacker-news",
     "minimumScore": 100,
     "topics": ["tech-radar"]
