@@ -45,6 +45,58 @@ async function buildSite(fullCheck = false) {
   });
 }
 
+async function git(repository: string, ...arguments_: string[]) {
+  return execute("git", arguments_, { cwd: repository });
+}
+
+async function configureGitForPublish(repository: string) {
+  const token = process.env.GH_TOKEN;
+  if (!token) return false;
+
+  const { stdout: rawUrl } = await git(repository, "remote", "get-url", "origin");
+  const url = rawUrl.trim();
+  if (!url) return false;
+
+  const authenticatedUrl = url.replace(/^https:\/\//, `https://x-access-token:${token}@`);
+  await git(repository, "remote", "set-url", "origin", authenticatedUrl);
+
+  try {
+    await git(repository, "config", "user.name");
+  } catch {
+    await git(repository, "config", "user.name", process.env.GIT_USER_NAME || "Tech Daily Bot");
+  }
+  try {
+    await git(repository, "config", "user.email");
+  } catch {
+    await git(repository, "config", "user.email", process.env.GIT_USER_EMAIL || "bot@techdaily.local");
+  }
+
+  return true;
+}
+
+async function publishGeneratedContent(repository: string, message: string) {
+  const { stdout } = await git(repository, "status", "--porcelain", "--untracked-files=all");
+  const lines = stdout
+    .split("\n")
+    .map((line) => line.trimEnd())
+    .filter(Boolean);
+  if (!lines.length) return { pushed: false };
+
+  const changedPaths = lines.map((line) => line.slice(3).trim());
+  const unrelated = changedPaths.filter(
+    (path) => !path.startsWith("src/content/daily/") && !path.startsWith("src/content/weekly/"),
+  );
+  if (unrelated.length) {
+    throw new Error(`Refusing to publish changes outside generated content: ${unrelated.join(", ")}`);
+  }
+
+  await git(repository, "add", "--", "src/content");
+  await git(repository, "commit", "-m", message);
+  await git(repository, "push", "origin", "HEAD");
+  const commit = (await git(repository, "rev-parse", "HEAD")).stdout.trim();
+  return { pushed: true, commit };
+}
+
 function shanghaiHour(now = new Date()) {
   return Number(
     new Intl.DateTimeFormat("en-US", {
@@ -181,16 +233,39 @@ async function runScheduler() {
     } else {
       phase = "idle";
     }
+    let gitPublishError: string | undefined;
     if (result.completedDailyDates?.length || result.completedWeeks?.length) {
       phase = "rebuilding";
       await writeStatus({ result });
       await buildSite(false);
       phase = "idle";
       process.stdout.write(`Rebuilt site after publishing ${resultLine}\n`);
+
+      if (process.env.AUTO_PUBLISH !== "false" && process.env.GH_TOKEN) {
+        try {
+          await configureGitForPublish(root);
+          const labels = [...(result.completedDailyDates ?? []), ...(result.completedWeeks ?? [])].join(", ");
+          const publishResult = await publishGeneratedContent(root, `publish reports for ${labels}`);
+          if (publishResult.pushed) {
+            process.stdout.write(`Pushed generated content: ${publishResult.commit}\n`);
+          } else {
+            process.stdout.write("No generated content changes to push.\n");
+          }
+        } catch (error) {
+          gitPublishError = error instanceof Error ? error.message : String(error);
+          process.stderr.write(`Git publish failed: ${gitPublishError}\n`);
+          lastSchedulerResult = gitPublishError.slice(0, 4000);
+          phase = "failed";
+          await writeStatus({ ok: false, error: gitPublishError.slice(0, 4000) });
+        }
+      }
     } else {
       process.stdout.write("Scheduler ran but nothing new was published.\n");
     }
-    await writeStatus({ ok: !(result.failedDailyDate || result.failedWeek || (code && code !== 0)), result });
+    await writeStatus({
+      ok: !(result.failedDailyDate || result.failedWeek || (code && code !== 0) || gitPublishError),
+      result,
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     process.stderr.write(`Scheduler failed: ${message}\n`);
