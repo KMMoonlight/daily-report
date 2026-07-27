@@ -1,5 +1,6 @@
 import { appendFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
+import { IncompleteWeekError } from "./generate-weekly";
 
 interface Ledger {
   successfulDailyDates: string[];
@@ -72,6 +73,7 @@ async function retry<T>(operation: () => Promise<T>, attempts = 3): Promise<T> {
       return await operation();
     } catch (error) {
       lastError = error;
+      if (error instanceof IncompleteWeekError) throw error;
     }
   }
   throw lastError;
@@ -154,10 +156,22 @@ export async function runScheduledGeneration(options: SchedulerOptions): Promise
         await persist();
         await log({ event: "weekly-succeeded", weekStart });
       } catch (error) {
-        result.failedWeek = weekStart;
-        ledger.runs.push({ kind: "weekly", period: weekStart, status: "failed", at: now.toISOString() });
-        await persist();
-        await log({ event: "weekly-failed", weekStart, error: error instanceof Error ? error.message : String(error) });
+        if (error instanceof IncompleteWeekError) {
+          await persist();
+          await log({
+            event: "weekly-skipped-incomplete",
+            weekStart,
+            missingDates: error.missingDates,
+          });
+          process.stdout.write(
+            `Skipping weekly ${weekStart}; missing daily reports: ${error.missingDates.join(", ")}\n`,
+          );
+        } else {
+          result.failedWeek = weekStart;
+          ledger.runs.push({ kind: "weekly", period: weekStart, status: "failed", at: now.toISOString() });
+          await persist();
+          await log({ event: "weekly-failed", weekStart, error: error instanceof Error ? error.message : String(error) });
+        }
       }
     }
   }

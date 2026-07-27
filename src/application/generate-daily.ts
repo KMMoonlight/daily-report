@@ -10,6 +10,7 @@ import {
   normalizeCollectedItem,
   normalizeTitle,
 } from "./cluster-items";
+import { isHollowReportCopy, isHollowTrendingCandidate } from "../presentation/substance";
 
 interface GenerateDailyOptions {
   date: string;
@@ -138,7 +139,12 @@ export async function generateDaily(options: GenerateDailyOptions): Promise<Dail
 
   const inWindow = collected.filter((item) => {
     const publishedAt = new Date(item.publishedAt).valueOf();
-    return publishedAt >= window.start.valueOf() && publishedAt <= window.end.valueOf();
+    if (publishedAt < window.start.valueOf() || publishedAt > window.end.valueOf()) return false;
+    if (isHollowTrendingCandidate(item)) {
+      process.stdout.write(`Skipping hollow trending candidate ${item.externalId}\n`);
+      return false;
+    }
+    return true;
   });
   const lateItemsPath = join(options.dataDirectory, "late-items.json");
   let existingLateItems: CollectedItem[] = [];
@@ -192,6 +198,11 @@ export async function generateDaily(options: GenerateDailyOptions): Promise<Dail
       const lacksHighImpactVerification = triage.impact === "high" && !hasPrimarySource && independentSources < 2;
       const effectiveTriage = triage;
       const synthesis = await retryModel(() => options.model.synthesize(cluster, effectiveTriage));
+      if (isHollowReportCopy(synthesis.title, synthesis.summary, synthesis.analysis)) {
+        process.stdout.write(`Skipping hollow synthesis for ${primary.externalId}: ${synthesis.title}\n`);
+        candidates.push(...cluster);
+        continue;
+      }
       const id = slugify(`${primary.externalId}-${synthesis.title}`);
       const existingStoryKey =
         primary.sourceId === "github-trending" ? `github-trending:${primary.externalId}` : clusterKey;

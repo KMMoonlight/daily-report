@@ -22,6 +22,18 @@ export interface WeeklyGenerationResult {
   removedCacheFiles: number;
 }
 
+export class IncompleteWeekError extends Error {
+  readonly weekStart: string;
+  readonly missingDates: string[];
+
+  constructor(weekStart: string, missingDates: string[]) {
+    super(`Weekly report requires 7 daily reports; missing ${missingDates.join(", ")}`);
+    this.name = "IncompleteWeekError";
+    this.weekStart = weekStart;
+    this.missingDates = missingDates;
+  }
+}
+
 function dateString(date: Date) {
   return new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Shanghai",
@@ -29,6 +41,16 @@ function dateString(date: Date) {
     month: "2-digit",
     day: "2-digit",
   }).format(date);
+}
+
+function addCalendarDays(date: string, days: number) {
+  const value = new Date(`${date}T12:00:00Z`);
+  value.setUTCDate(value.getUTCDate() + days);
+  return value.toISOString().slice(0, 10);
+}
+
+export function listWeekDates(weekStart: string) {
+  return Array.from({ length: 7 }, (_, index) => addCalendarDays(weekStart, index));
 }
 
 function isoWeek(date: string) {
@@ -86,6 +108,11 @@ export async function generateWeekly(options: GenerateWeeklyOptions): Promise<We
   const end = new Date(start.valueOf() + 7 * 86_400_000 - 1);
   const publishDate = dateString(new Date(end.valueOf() + 1));
   const reports = await readReports(options.dailyContentDirectory);
+  const availableDates = new Set(reports.map((report) => report.date));
+  const missingDates = listWeekDates(options.weekStart).filter((date) => !availableDates.has(date));
+  if (missingDates.length > 0) {
+    throw new IncompleteWeekError(options.weekStart, missingDates);
+  }
   const selectedReports = reports.filter((report) => {
     const reportDate = new Date(`${report.date}T00:00:00+08:00`).valueOf();
     return reportDate >= start.valueOf() && reportDate <= end.valueOf();

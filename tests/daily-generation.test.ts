@@ -303,7 +303,11 @@ describe("daily generation command", () => {
         return { include: true, section: "products", topics: ["developer-tools"], reason: "relevant" };
       },
       async synthesize() {
-        return { title: "可重试的发布", summary: "发布摘要。", analysis: "对开发者有用。" };
+        return {
+          title: "可重试的发布",
+          summary: "该版本修复了关键崩溃，并新增本地缓存支持。",
+          analysis: "对依赖该工具的开发者可直接降低故障率。",
+        };
       },
       async weeklySynthesis() {
         return "";
