@@ -74,6 +74,19 @@ async function configureGitForPublish(repository: string) {
   return true;
 }
 
+async function publishBranch(repository: string) {
+  const configured = process.env.GIT_BRANCH?.trim();
+  if (configured) return configured;
+  const current = (await git(repository, "branch", "--show-current")).stdout.trim();
+  if (current) return current;
+  // Platforms such as Zeabur check out a bare commit, leaving a detached HEAD.
+  // In that case `git push origin HEAD` has no destination ref; fall back to
+  // the remote's default branch (or `main` if it cannot be determined).
+  const { stdout } = await git(repository, "ls-remote", "--symref", "origin", "HEAD");
+  const match = /^ref: refs\/heads\/(\S+)\s+HEAD/m.exec(stdout);
+  return match?.[1] ?? "main";
+}
+
 async function publishGeneratedContent(repository: string, message: string) {
   const { stdout } = await git(repository, "status", "--porcelain", "--untracked-files=all");
   const lines = stdout
@@ -92,7 +105,8 @@ async function publishGeneratedContent(repository: string, message: string) {
 
   await git(repository, "add", "--", "src/content");
   await git(repository, "commit", "-m", message);
-  await git(repository, "push", "origin", "HEAD");
+  const branch = await publishBranch(repository);
+  await git(repository, "push", "origin", `HEAD:refs/heads/${branch}`);
   const commit = (await git(repository, "rev-parse", "HEAD")).stdout.trim();
   return { pushed: true, commit };
 }

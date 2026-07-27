@@ -29,6 +29,7 @@ Zeabur 直接使用仓库 `Dockerfile`，监听 8080 端口。
 - 生成 `src/content/daily/`、`src/content/weekly/` 后，容器会自动 `git commit` 并 `git push` 回仓库。
 - 需要设置 `GH_TOKEN`：一个能写仓库的 GitHub Personal Access Token（classic 选 `repo` scope）。
 - 可选设置 `GIT_USER_NAME`、`GIT_USER_EMAIL`（默认分别为 `Tech Daily Bot`、`bot@techdaily.local`）。
+- 可选设置 `GIT_BRANCH` 指定推送分支；默认取当前分支，处于 detached HEAD（如 Zeabur 按提交检出）时自动回退到远端默认分支。
 - 如不想自动推送，设置 `AUTO_PUBLISH=false`。
 
 这样重新部署时，已生成的日报会随仓库代码一起进入镜像，不再依赖平台持久卷。
