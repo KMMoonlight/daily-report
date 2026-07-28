@@ -276,6 +276,73 @@ describe("daily generation command", () => {
     expect(markdown).toContain("imageAlt: Agent protocol 产品截图");
   });
 
+  it("does not republish a trending repository when local story state is lost", async () => {
+    const root = await mkdtemp(join(tmpdir(), "tech-daily-"));
+    temporaryDirectories.push(root);
+    let publishedAt = "2026-07-25T15:59:59.999Z";
+    const source: SourceAdapter = {
+      id: "github-trending",
+      async collect() {
+        return [
+          {
+            externalId: "owner/repository",
+            sourceId: "github-trending",
+            title: "owner/repository: A substantive developer tool for testing deployments",
+            url: "https://github.com/owner/repository",
+            publishedAt,
+            discoveredAt: publishedAt,
+            excerpt: "A substantive developer tool for testing deployments · Language: TypeScript",
+            sourceKind: "community",
+            suggestedTopics: ["developer-tools"],
+            fullTextRead: false,
+          },
+        ];
+      },
+    };
+    let modelCalls = 0;
+    const model: LanguageModel = {
+      async triage() {
+        modelCalls += 1;
+        return { include: true, section: "products", topics: ["developer-tools"], reason: "useful tool" };
+      },
+      async synthesize() {
+        return {
+          title: "Repository deployment tool",
+          summary: "The repository provides a substantive deployment workflow.",
+          analysis: "Developers can use it to verify application deployments.",
+        };
+      },
+      async weeklySynthesis() {
+        return "";
+      },
+    };
+    const contentDirectory = join(root, "content");
+    const cacheDirectory = join(root, "cache");
+
+    const first = await generateDaily({
+      date: "2026-07-25",
+      adapters: [source],
+      model,
+      contentDirectory,
+      cacheDirectory,
+      dataDirectory: join(root, "first-data"),
+    });
+    publishedAt = "2026-07-26T15:59:59.999Z";
+    const second = await generateDaily({
+      date: "2026-07-26",
+      adapters: [source],
+      model,
+      contentDirectory,
+      cacheDirectory,
+      dataDirectory: join(root, "fresh-data"),
+    });
+
+    expect(first.publishedItems).toBe(1);
+    expect(second.publishedItems).toBe(0);
+    expect(modelCalls).toBe(1);
+    await expect(readFile(join(contentDirectory, "2026-07-26.md"), "utf8")).rejects.toMatchObject({ code: "ENOENT" });
+  });
+
   it("retries transient model format failures before dropping an item", async () => {
     const root = await mkdtemp(join(tmpdir(), "tech-daily-"));
     temporaryDirectories.push(root);

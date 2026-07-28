@@ -1,10 +1,12 @@
-import { access, mkdir, readFile, writeFile } from "node:fs/promises";
+import { access, mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import matter from "gray-matter";
 import { stringify } from "yaml";
 import { dailyEdition, reportSchema, type Report, type ReportItem } from "../domain/report";
 import type { LanguageModel } from "../infrastructure/llm";
 import type { CollectedItem, SourceAdapter } from "../infrastructure/sources";
 import {
+  canonicalUrl,
   clusterItems,
   mergeDuplicateReportItems,
   normalizeCollectedItem,
@@ -68,6 +70,19 @@ function renderMarkdown(report: Report) {
   return `---\n${stringify(report).trimEnd()}\n---\n\n本报告由 Tech Daily & Weekly 自动生成。\n`;
 }
 
+async function publishedSourceUrls(contentDirectory: string) {
+  const urls = new Set<string>();
+  const files = (await readdir(contentDirectory)).filter((file) => file.endsWith(".md")).sort();
+  for (const file of files) {
+    const { data } = matter(await readFile(join(contentDirectory, file), "utf8"));
+    const report = reportSchema.parse(data);
+    for (const item of report.items) {
+      for (const source of item.sources) urls.add(canonicalUrl(source.url));
+    }
+  }
+  return urls;
+}
+
 async function retryModel<T>(operation: () => Promise<T>, attempts = 3): Promise<T> {
   let lastError: unknown;
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
@@ -98,6 +113,7 @@ export async function generateDaily(options: GenerateDailyOptions): Promise<Dail
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
   }
+  const existingPublishedSourceUrls = await publishedSourceUrls(options.contentDirectory);
   const volumePath = join(options.dataDirectory, "source-volumes.json");
   let volumes: SourceVolumeState = {};
   try {
@@ -186,6 +202,13 @@ export async function generateDaily(options: GenerateDailyOptions): Promise<Dail
   for (const { key: clusterKey, items: cluster } of clusterItems([...inWindow, ...reconsideredCandidates])) {
     const primary = cluster[0];
     if (!primary) continue;
+    if (
+      primary.sourceId === "github-trending" &&
+      primary.normalizedUrl &&
+      existingPublishedSourceUrls.has(primary.normalizedUrl)
+    ) {
+      continue;
+    }
     try {
       const triage = await retryModel(() => options.model.triage(primary));
       if (!triage.include) {
