@@ -116,3 +116,15 @@ export type Report = z.infer<typeof reportSchema>;
 export type ReportItem = z.infer<typeof reportItemSchema>;
 export type ReportSection = z.infer<typeof sectionSchema>;
 export type Topic = z.infer<typeof topicSchema>;
+
+export function dailyEditionDate(coverageEnd: string | Date) {
+  const end = coverageEnd instanceof Date ? coverageEnd : new Date(coverageEnd);
+  if (Number.isNaN(end.valueOf())) throw new Error(`Invalid daily coverage end: ${coverageEnd}`);
+
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Shanghai",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date(end.valueOf() + 1));
+}

@@ -1,6 +1,7 @@
 ---
 import { getCollection } from "astro:content";
 import ReportSections from "../../components/ReportSections.astro";
+import { dailyEditionDate } from "../../domain/report";
 import BaseLayout from "../../layouts/BaseLayout.astro";
 
 export async function getStaticPaths() {
@@ -9,6 +10,7 @@ export async function getStaticPaths() {
 }
 
 const { report } = Astro.props;
+const editionDate = dailyEditionDate(report.data.coverageEnd);
 const allDailyReports = await getCollection("daily");
 const itemLocations = new Map<string, string>();
 for (const dailyReport of allDailyReports) {
@@ -18,12 +20,12 @@ for (const dailyReport of allDailyReports) {
 }
 ---
 
-<BaseLayout title={`${report.data.title} · Tech Daily & Weekly`}>
+<BaseLayout title={`${editionDate} 科技日报 · Tech Daily & Weekly`}>
   <article class="report-shell">
     <header class="page-heading">
       <div>
-        <p class="report-date">{report.data.date} · Daily</p>
-        <h1>{report.data.title}</h1>
+        <p class="report-date">{editionDate} · Daily</p>
+        <h1>{editionDate} 科技日报</h1>
       </div>
       <a href="/archive">返回归档</a>
     </header>

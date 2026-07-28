@@ -6,7 +6,9 @@ test("reader can open the latest daily report", async ({ page }) => {
   await expect(page).toHaveTitle(/Tech Daily & Weekly/);
   await expect(page.getByRole("heading", { name: "今天，科技世界改变了什么？" })).toBeVisible();
   await expect(page.getByRole("navigation", { name: "最近日报" })).toBeVisible();
-  await expect(page.getByRole("link", { name: /最新日报/ })).toBeVisible();
+  const latestReport = page.getByRole("link", { name: /最新日报/ });
+  await expect(latestReport).toBeVisible();
+  await expect(latestReport.getByText("2026-07-27")).toBeVisible();
   await expect(page.getByText("从中英文一手来源")).toHaveCount(0);
   await expect(page.getByText("不是新闻瀑布")).toHaveCount(0);
   await expect(page.getByRole("contentinfo")).toHaveCount(0);
@@ -20,6 +22,7 @@ test("reader can filter and search the archive", async ({ page }) => {
 
   await page.getByLabel("搜索").fill("开放模型");
   await expect(page.getByText("开放模型进入可本地评估阶段")).toBeVisible();
+  await expect(page.locator(".archive-date").first()).toHaveText("2026-07-26");
 });
 
 test("archive reveals more matching entries on demand", async ({ page }) => {
@@ -50,6 +53,8 @@ test("correction section is not shown to readers", async ({ page }) => {
 test("daily content is grouped by section and product screenshots are optional", async ({ page }) => {
   await page.goto("/daily/2026-07-25");
 
+  await expect(page.getByText("2026-07-26 · Daily")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "2026-07-26 科技日报" })).toBeVisible();
   const headings = await page.locator("[data-section-group] > header h2").allTextContents();
   expect(headings).toEqual(["新品与工具", "研究与开源"]);
   await expect(page.locator('img[alt="终端编码智能体界面截图"]')).toHaveAttribute(

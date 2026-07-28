@@ -65,6 +65,8 @@ describe("daily generation command", () => {
     expect(result.publishedItems).toBe(1);
     const markdown = await readFile(join(root, "content", "2026-07-25.md"), "utf8");
     expect(markdown).toContain("kind: daily");
+    expect(markdown).toContain("title: 2026-07-26 科技日报");
+    expect(markdown).toContain("date: 2026-07-25");
     expect(markdown).toContain("开放模型发布权重与评估代码");
     expect(markdown).toContain("https://example.com/release");
   });

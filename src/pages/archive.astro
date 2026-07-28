@@ -1,11 +1,16 @@
 ---
 import { getCollection } from "astro:content";
 import ReportItem from "../components/ReportItem.astro";
+import { dailyEditionDate } from "../domain/report";
 import BaseLayout from "../layouts/BaseLayout.astro";
 
 const reports = (await getCollection("daily")).sort((a, b) => b.data.date.localeCompare(a.data.date));
 const entries = reports.flatMap((report) =>
-  report.data.items.map((item) => ({ reportId: report.id, reportDate: report.data.date, item })),
+  report.data.items.map((item) => ({
+    reportId: report.id,
+    reportDate: dailyEditionDate(report.data.coverageEnd),
+    item,
+  })),
 );
 const sections = [
   { id: "products", title: "新品与工具" },

@@ -1,10 +1,12 @@
 ---
 import { getCollection } from "astro:content";
+import { dailyEditionDate } from "../domain/report";
 import BaseLayout from "../layouts/BaseLayout.astro";
 
 const recentDailyReports = (await getCollection("daily"))
   .sort((a, b) => b.data.date.localeCompare(a.data.date))
-  .slice(0, 7);
+  .slice(0, 7)
+  .map((report) => ({ report, editionDate: dailyEditionDate(report.data.coverageEnd) }));
 ---
 
 <BaseLayout>
@@ -15,11 +17,11 @@ const recentDailyReports = (await getCollection("daily"))
       recentDailyReports.length > 0 ? (
         <nav class="recent-editions" aria-label="最近日报">
           <ul>
-            {recentDailyReports.map((report, index) => (
+            {recentDailyReports.map(({ report, editionDate }, index) => (
               <li>
                 <a href={`/daily/${report.id}`}>
-                  <span class="report-date">{report.data.date}</span>
-                  <strong>{index === 0 ? "最新日报" : report.data.title}</strong>
+                  <span class="report-date">{editionDate}</span>
+                  <strong>{index === 0 ? "最新日报" : `${editionDate} 科技日报`}</strong>
                 </a>
               </li>
             ))}
