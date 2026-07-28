@@ -1,7 +1,7 @@
 import { access, mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { stringify } from "yaml";
-import { dailyEditionDate, reportSchema, type Report, type ReportItem } from "../domain/report";
+import { dailyEdition, reportSchema, type Report, type ReportItem } from "../domain/report";
 import type { LanguageModel } from "../infrastructure/llm";
 import type { CollectedItem, SourceAdapter } from "../infrastructure/sources";
 import {
@@ -260,7 +260,7 @@ export async function generateDaily(options: GenerateDailyOptions): Promise<Dail
 
   const report = reportSchema.parse({
     kind: "daily",
-    title: `${dailyEditionDate(window.end)} 科技日报`,
+    title: dailyEdition(window.end).title,
     date: options.date,
     coverageStart: window.start.toISOString(),
     coverageEnd: window.end.toISOString(),
